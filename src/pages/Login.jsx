@@ -17,7 +17,7 @@ import {
 import {
   Visibility,
   VisibilityOff,
-  Email as EmailIcon,
+  Phone as PhoneIcon,
   Lock as LockIcon,
   FitnessCenter as FitnessCenterIcon,
   Google as GoogleIcon,
@@ -30,7 +30,7 @@ import { Link as RouterLink, useNavigate } from 'react-router-dom';
 const Login = () => {
   const navigate = useNavigate();
   const [formData, setFormData] = useState({
-    email: '',
+    phone: '',
     password: '',
     rememberMe: true,
   });
@@ -41,40 +41,44 @@ const Login = () => {
 
   const handleChange = (e) => {
     const { name, value, checked, type } = e.target;
-    setFormData({
-      ...formData,
+    setFormData((prev) => ({
+      ...prev,
       [name]: type === 'checkbox' ? checked : value,
-    });
+    }));
     if (error) setError('');
   };
 
-  const handleQuickLogin = (email, pass) => {
-    setFormData({
-      ...formData,
-      email: email,
+  const handleQuickLogin = (phone, pass) => {
+    setFormData((prev) => ({
+      ...prev,
+      phone: phone,
       password: pass,
-    });
+    }));
+    if (error) setError('');
   };
 
   const handleSubmit = (e) => {
     e.preventDefault();
-    if (!formData.email || !formData.password) {
-      setError('Vui lòng nhập đầy đủ Email và Mật khẩu.');
+    const phoneTrimmed = formData.phone.trim();
+    if (!phoneTrimmed || !formData.password) {
+      setError('Vui lòng nhập đầy đủ Số điện thoại và Mật khẩu.');
       return;
     }
 
-    if (!formData.email.includes('@')) {
-      setError('Định dạng email không hợp lệ.');
+    const phoneRegex = /^(0|\+84)[3|5|7|8|9][0-9]{8}$/;
+    if (!phoneRegex.test(phoneTrimmed)) {
+      setError('Số điện thoại không đúng định dạng VN (10 chữ số, ví dụ: 0912345678).');
       return;
     }
 
     setLoading(true);
+    // Tạm thời mô phỏng đăng nhập; sẵn sàng nối authService.login({ phone, password })
     setTimeout(() => {
       setLoading(false);
       setSuccess(true);
       setTimeout(() => {
         navigate('/');
-      }, 1500);
+      }, 1200);
     }, 800);
   };
 
@@ -195,23 +199,23 @@ const Login = () => {
               <Typography variant="caption" sx={{ fontWeight: 700, color: 'text.secondary', display: 'block', mb: 1 }}>
                 ⚡ TÀI KHOẢN MẪU DÙNG THỬ NHANH:
               </Typography>
-              <Stack direction="row" spacing={1}>
+              <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap>
                 <Button
                   size="small"
                   variant="outlined"
-                  onClick={() => handleQuickLogin('member@aurasport.vn', '123456')}
+                  onClick={() => handleQuickLogin('0912345678', '123456')}
                   sx={{ fontSize: '0.75rem', py: 0.5 }}
                 >
-                  Hội Viên (Member)
+                  Hội Viên (0912345678)
                 </Button>
                 <Button
                   size="small"
                   variant="outlined"
                   color="secondary"
-                  onClick={() => handleQuickLogin('trainer@aurasport.vn', '123456')}
+                  onClick={() => handleQuickLogin('0987654321', '123456')}
                   sx={{ fontSize: '0.75rem', py: 0.5 }}
                 >
-                  Huấn Luyện Viên (Trainer)
+                  Huấn Luyện Viên (0987654321)
                 </Button>
               </Stack>
             </Box>
@@ -232,17 +236,18 @@ const Login = () => {
               <Stack spacing={2.5}>
                 <TextField
                   fullWidth
-                  label="Email của bạn"
-                  name="email"
-                  type="email"
-                  value={formData.email}
+                  label="Số điện thoại"
+                  name="phone"
+                  type="tel"
+                  value={formData.phone}
                   onChange={handleChange}
-                  placeholder="name@example.com"
+                  placeholder="0912 345 678"
+                  autoComplete="tel"
                   slotProps={{
                     input: {
                       startAdornment: (
                         <InputAdornment position="start">
-                          <EmailIcon sx={{ color: 'text.secondary', fontSize: 20 }} />
+                          <PhoneIcon sx={{ color: 'text.secondary', fontSize: 20 }} />
                         </InputAdornment>
                       ),
                     },
