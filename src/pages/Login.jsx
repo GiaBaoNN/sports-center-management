@@ -25,10 +25,13 @@ import {
   Apple as AppleIcon,
   CheckCircle as CheckCircleIcon,
 } from '@mui/icons-material';
-import { Link as RouterLink, useNavigate } from 'react-router-dom';
+import { Link as RouterLink, useNavigate, useLocation } from 'react-router-dom';
+import { useAuth, ROLES } from '../context/AuthContext';
 
 const Login = () => {
   const navigate = useNavigate();
+  const location = useLocation();
+  const { login } = useAuth();
   const [formData, setFormData] = useState({
     phone: '',
     password: '',
@@ -37,6 +40,7 @@ const Login = () => {
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState(false);
+  const [successMsg, setSuccessMsg] = useState('');
   const [loading, setLoading] = useState(false);
 
   const handleChange = (e) => {
@@ -57,7 +61,7 @@ const Login = () => {
     if (error) setError('');
   };
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
     const phoneTrimmed = formData.phone.trim();
     if (!phoneTrimmed || !formData.password) {
@@ -71,15 +75,22 @@ const Login = () => {
       return;
     }
 
-    setLoading(true);
-    // Tạm thời mô phỏng đăng nhập; sẵn sàng nối authService.login({ phone, password })
-    setTimeout(() => {
-      setLoading(false);
+    try {
+      setLoading(true);
+      setError('');
+      const res = await login(phoneTrimmed, formData.password);
+      setSuccessMsg(`Đăng nhập thành công với vai trò: ${res.roleConfig.label}! Đang chuyển hướng...`);
       setSuccess(true);
+
+      const redirectPath = location.state?.from?.pathname || res.roleConfig.dashboardPath || '/';
       setTimeout(() => {
-        navigate('/');
-      }, 1200);
-    }, 800);
+        navigate(redirectPath, { replace: true });
+      }, 1000);
+    } catch (err) {
+      setError(err.message || 'Đăng nhập không thành công. Vui lòng kiểm tra lại.');
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -197,27 +208,58 @@ const Login = () => {
             {/* Quick Demo Fill Buttons */}
             <Box sx={{ p: 2, bgcolor: '#F1F5F9', borderRadius: 3, mb: 3 }}>
               <Typography variant="caption" sx={{ fontWeight: 700, color: 'text.secondary', display: 'block', mb: 1 }}>
-                ⚡ TÀI KHOẢN MẪU DÙNG THỬ NHANH:
+                ⚡ TÀI KHOẢN MẪU THEO 4 VAI TRÒ (SCMS):
               </Typography>
-              <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap>
-                <Button
-                  size="small"
-                  variant="outlined"
-                  onClick={() => handleQuickLogin('0912345678', '123456')}
-                  sx={{ fontSize: '0.75rem', py: 0.5 }}
-                >
-                  Hội Viên (0912345678)
-                </Button>
-                <Button
-                  size="small"
-                  variant="outlined"
-                  color="secondary"
-                  onClick={() => handleQuickLogin('0987654321', '123456')}
-                  sx={{ fontSize: '0.75rem', py: 0.5 }}
-                >
-                  Huấn Luyện Viên (0987654321)
-                </Button>
-              </Stack>
+              <Grid container spacing={1}>
+                <Grid size={{ xs: 6 }}>
+                  <Button
+                    fullWidth
+                    size="small"
+                    variant="outlined"
+                    color="primary"
+                    onClick={() => handleQuickLogin('0912345678', 'password123')}
+                    sx={{ fontSize: '0.72rem', py: 0.5, textTransform: 'none', fontWeight: 700 }}
+                  >
+                    👤 Hội Viên (0912345678)
+                  </Button>
+                </Grid>
+                <Grid size={{ xs: 6 }}>
+                  <Button
+                    fullWidth
+                    size="small"
+                    variant="outlined"
+                    color="secondary"
+                    onClick={() => handleQuickLogin('0987654321', 'password123')}
+                    sx={{ fontSize: '0.72rem', py: 0.5, textTransform: 'none', fontWeight: 700 }}
+                  >
+                    🏋️ HLV (0987654321)
+                  </Button>
+                </Grid>
+                <Grid size={{ xs: 6 }}>
+                  <Button
+                    fullWidth
+                    size="small"
+                    variant="outlined"
+                    color="warning"
+                    onClick={() => handleQuickLogin('0934567890', 'password123')}
+                    sx={{ fontSize: '0.72rem', py: 0.5, textTransform: 'none', fontWeight: 700 }}
+                  >
+                    🧑💼 Lễ Tân (0934567890)
+                  </Button>
+                </Grid>
+                <Grid size={{ xs: 6 }}>
+                  <Button
+                    fullWidth
+                    size="small"
+                    variant="outlined"
+                    color="error"
+                    onClick={() => handleQuickLogin('0901234567', 'password123')}
+                    sx={{ fontSize: '0.72rem', py: 0.5, textTransform: 'none', fontWeight: 700 }}
+                  >
+                    👔 Quản Lý (0901234567)
+                  </Button>
+                </Grid>
+              </Grid>
             </Box>
 
             {error && (
@@ -228,7 +270,7 @@ const Login = () => {
 
             {success && (
               <Alert severity="success" icon={<CheckCircleIcon />} sx={{ mb: 3 }}>
-                Đăng nhập thành công! Đang chuyển hướng về trang chủ...
+                {successMsg || 'Đăng nhập thành công! Đang chuyển hướng...'}
               </Alert>
             )}
 
