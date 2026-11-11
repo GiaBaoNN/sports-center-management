@@ -10,22 +10,15 @@ import {
   Paper,
   Stack,
   Chip,
-  Button,
-  Divider,
 } from '@mui/material';
 import {
   EmojiEvents as TrophyIcon,
   Visibility as VisionIcon,
   TrackChanges as MissionIcon,
   Favorite as HeartIcon,
-  Star as StarIcon,
-  FitnessCenter as FitnessCenterIcon,
-  Shield as ShieldIcon,
   Groups as GroupsIcon,
   Psychology as MindIcon,
-  ArrowForward as ArrowForwardIcon,
 } from '@mui/icons-material';
-import { Link as RouterLink } from 'react-router-dom';
 import SectionHeader from '../components/common/SectionHeader';
 import { companyTimeline, leadershipTeam, centerStats } from '../data/sportsData';
 

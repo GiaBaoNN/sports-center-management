@@ -1,63 +1,108 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Dialog,
-  DialogTitle,
   DialogContent,
-  DialogActions,
   IconButton,
   Typography,
   Box,
   Grid,
   Chip,
   Button,
-  TextField,
   Avatar,
   Divider,
-  LinearProgress,
   Alert,
   Stack,
+  CircularProgress,
+  List,
+  ListItem,
+  ListItemIcon,
+  ListItemText,
 } from '@mui/material';
 import {
   Close as CloseIcon,
-  AccessTime as AccessTimeIcon,
   Room as RoomIcon,
-  Whatshot as FireIcon,
   FitnessCenter as FitnessCenterIcon,
   CheckCircle as CheckCircleIcon,
   CalendarMonth as CalendarIcon,
   Person as PersonIcon,
+  Phone as PhoneIcon,
+  Login as LoginIcon,
+  Warning as WarningIcon,
 } from '@mui/icons-material';
+import { useNavigate } from 'react-router-dom';
+import { useAuth } from '../../context/AuthContext';
+import { classApi } from '../../services/api';
 
-const ClassDetailModal = ({ open, onClose, classItem }) => {
-  const [formSubmitted, setFormSubmitted] = useState(false);
-  const [formData, setFormData] = useState({
-    fullName: '',
-    phone: '',
-    email: '',
-    date: '2026-10-25',
-    note: '',
-  });
+const ClassDetailModal = ({ open, onClose, classItem, onRegistrationSuccess }) => {
+  const navigate = useNavigate();
+  const { user, isAuthenticated, isMember } = useAuth();
+
+  const [schedules, setSchedules] = useState([]);
+  const [loadingSchedules, setLoadingSchedules] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+  const [registrationResult, setRegistrationResult] = useState(null);
+  const [errorMessage, setErrorMessage] = useState('');
+
+  // Fetch real schedules from backend when modal opens
+  useEffect(() => {
+    if (open && classItem?.id) {
+      setRegistrationResult(null);
+      setErrorMessage('');
+      setLoadingSchedules(true);
+
+      classApi
+        .getSchedules(classItem.id)
+        .then((data) => {
+          setSchedules(data || []);
+        })
+        .catch((err) => {
+          console.warn('Could not load schedules from backend:', err);
+          setSchedules([]);
+        })
+        .finally(() => {
+          setLoadingSchedules(false);
+        });
+    }
+  }, [open, classItem]);
 
   if (!classItem) return null;
 
-  const handleChange = (e) => {
-    setFormData({ ...formData, [e.target.name]: e.target.value });
-  };
+  const handleRegister = async () => {
+    if (!isAuthenticated) {
+      navigate('/login', { state: { from: '/classes' } });
+      return;
+    }
 
-  const handleSubmit = (e) => {
-    e.preventDefault();
-    if (formData.fullName && formData.phone) {
-      setFormSubmitted(true);
+    if (!isMember) {
+      setErrorMessage(
+        `Tài khoản hiện tại có vai trò "${user?.role}". Theo quy định hệ thống SCMS, chỉ tài khoản "Member" mới có quyền đăng ký tham gia lớp học.`
+      );
+      return;
+    }
+
+    setSubmitting(true);
+    setErrorMessage('');
+
+    try {
+      // Backend Contract: POST /api/classes/:classId/register
+      // Authenticated via Authorization: Bearer <token>
+      const response = await classApi.register(classItem.id);
+      setRegistrationResult(response.data || response);
+      if (onRegistrationSuccess) {
+        onRegistrationSuccess(classItem.id);
+      }
+    } catch (err) {
+      setErrorMessage(err.message || 'Đăng ký lớp học thất bại. Vui lòng thử lại sau.');
+    } finally {
+      setSubmitting(false);
     }
   };
 
   const handleClose = () => {
-    setFormSubmitted(false);
+    setRegistrationResult(null);
+    setErrorMessage('');
     onClose();
   };
-
-  const availableSlots = classItem.capacity - classItem.booked;
-  const progressPercent = Math.round((classItem.booked / classItem.capacity) * 100);
 
   return (
     <Dialog
@@ -75,11 +120,14 @@ const ClassDetailModal = ({ open, onClose, classItem }) => {
       <Box sx={{ position: 'relative' }}>
         <Box
           component="img"
-          src={classItem.image}
+          src={
+            classItem.image ||
+            'https://images.unsplash.com/photo-1517838277536-f5f99be501cd?q=80&w=800&auto=format&fit=crop'
+          }
           alt={classItem.title}
           sx={{
             width: '100%',
-            height: { xs: 200, sm: 260 },
+            height: { xs: 200, sm: 250 },
             objectFit: 'cover',
           }}
         />
@@ -90,7 +138,7 @@ const ClassDetailModal = ({ open, onClose, classItem }) => {
             left: 0,
             right: 0,
             bottom: 0,
-            background: 'linear-gradient(180deg, rgba(0,0,0,0.2) 0%, rgba(0,0,0,0.85) 100%)',
+            background: 'linear-gradient(180deg, rgba(0,0,0,0.2) 0%, rgba(15, 23, 42, 0.9) 100%)',
           }}
         />
         <IconButton
@@ -116,19 +164,19 @@ const ClassDetailModal = ({ open, onClose, classItem }) => {
               sx={{ fontWeight: 700 }}
             />
             <Chip
-              label={classItem.status}
+              label={classItem.status || 'Upcoming'}
               size="small"
               color={
-                classItem.status === 'Còn chỗ'
+                classItem.rawStatus === 'Upcoming' || classItem.status === 'Sắp diễn ra'
+                  ? 'info'
+                  : classItem.rawStatus === 'Ongoing'
                   ? 'success'
-                  : classItem.status === 'Sắp hết'
-                  ? 'warning'
-                  : 'error'
+                  : 'default'
               }
               sx={{ fontWeight: 700 }}
             />
             <Chip
-              label={`Cấp độ: ${classItem.level}`}
+              label={`Mã lớp: #${classItem.id}`}
               size="small"
               sx={{ bgcolor: 'rgba(255,255,255,0.2)', color: '#FFFFFF', fontWeight: 600 }}
             />
@@ -140,24 +188,25 @@ const ClassDetailModal = ({ open, onClose, classItem }) => {
       </Box>
 
       <DialogContent sx={{ p: { xs: 3, md: 4 } }}>
-        {formSubmitted ? (
+        {registrationResult ? (
           <Box sx={{ textAlign: 'center', py: 4 }}>
             <CheckCircleIcon sx={{ fontSize: 72, color: 'success.main', mb: 2 }} />
             <Typography variant="h5" sx={{ fontWeight: 800, mb: 1 }}>
-              Đăng Ký Học Thử Thành Công!
+              Đăng Ký Lớp Học Thành Công!
             </Typography>
             <Typography variant="body1" color="text.secondary" sx={{ mb: 3, maxWidth: 500, mx: 'auto' }}>
-              Cảm ơn <strong>{formData.fullName}</strong>. Tư vấn viên thể thao và HLV{' '}
-              <strong>{classItem.trainer}</strong> sẽ liên hệ xác nhận lịch học qua SĐT{' '}
-              <strong>{formData.phone}</strong> trong vòng 15 phút.
+              Chúc mừng <strong>{user?.fullName || user?.username}</strong>! Bạn đã được ghi danh chính thức vào lớp{' '}
+              <strong>{classItem.title}</strong> do HLV <strong>{classItem.trainer}</strong> phụ trách.
             </Typography>
-            <Alert severity="info" sx={{ maxWidth: 460, mx: 'auto', mb: 3, textAlign: 'left' }}>
-              Mã giữ chỗ: <strong>AUR-{Math.floor(100000 + Math.random() * 900000)}</strong>
+            <Alert severity="success" sx={{ maxWidth: 480, mx: 'auto', mb: 3, textAlign: 'left' }}>
+              Mã đăng ký (Registration ID): <strong>#{registrationResult.registrationId || registrationResult.id || 'REG-' + classItem.id}</strong>
               <br />
-              Vui lòng mang theo trang phục tập luyện thoải mái và có mặt trước 10 phút.
+              Trạng thái: <strong>Đã ghi danh (Registered)</strong>
+              <br />
+              Phòng học: {classItem.room}
             </Alert>
             <Button variant="contained" color="primary" onClick={handleClose}>
-              Hoàn Tất & Đóng
+              Đóng Cửa Sổ
             </Button>
           </Box>
         ) : (
@@ -165,157 +214,194 @@ const ClassDetailModal = ({ open, onClose, classItem }) => {
             {/* Left Col: Class Details */}
             <Grid size={{ xs: 12, md: 6 }}>
               <Typography variant="subtitle2" color="primary" sx={{ fontWeight: 700, mb: 1 }}>
-                THÔNG TIN LỚP HỌC
+                THÔNG TIN LỚP HỌC (BACKEND DATA)
               </Typography>
               <Typography variant="body2" color="text.secondary" paragraph sx={{ lineHeight: 1.7 }}>
-                {classItem.description}
+                {classItem.sportDesc || classItem.description || 'Lớp học thể thao chuyên sâu với trang thiết bị chuẩn quốc tế.'}
               </Typography>
 
-              <Stack spacing={1.5} sx={{ mb: 3 }}>
-                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
-                  <AccessTimeIcon sx={{ color: 'primary.main', fontSize: 20 }} />
-                  <Typography variant="body2">
-                    <strong>Thời gian:</strong> {classItem.time} ({classItem.daysShort})
-                  </Typography>
-                </Box>
+              <Stack spacing={1.5} sx={{ mb: 2.5 }}>
                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
                   <RoomIcon sx={{ color: 'secondary.main', fontSize: 20 }} />
                   <Typography variant="body2">
-                    <strong>Địa điểm:</strong> {classItem.room}
+                    <strong>Phòng học:</strong> {classItem.room}
                   </Typography>
                 </Box>
                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
-                  <FireIcon sx={{ color: '#FF6B35', fontSize: 20 }} />
+                  <FitnessCenterIcon sx={{ color: 'primary.main', fontSize: 20 }} />
                   <Typography variant="body2">
-                    <strong>Đốt calo dự kiến:</strong> {classItem.calories}
+                    <strong>Sức chứa phòng (Max Capacity):</strong> {classItem.capacity} học viên
                   </Typography>
                 </Box>
               </Stack>
 
               <Divider sx={{ my: 2 }} />
 
-              {/* Trainer box */}
+              {/* Coach details */}
               <Typography variant="subtitle2" color="text.secondary" sx={{ fontWeight: 700, mb: 1.5 }}>
                 HUẤN LUYỆN VIÊN ĐỨNG LỚP:
               </Typography>
               <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, p: 2, bgcolor: '#F8FAFC', borderRadius: 3 }}>
-                <Avatar src={classItem.trainerAvatar} alt={classItem.trainer} sx={{ width: 52, height: 52 }} />
+                <Avatar sx={{ width: 48, height: 48, bgcolor: 'primary.main', fontWeight: 800 }}>
+                  {classItem.trainer?.charAt(0) || 'C'}
+                </Avatar>
                 <Box>
                   <Typography variant="subtitle1" sx={{ fontWeight: 700 }}>
                     {classItem.trainer}
                   </Typography>
-                  <Typography variant="caption" color="text.secondary">
-                    Chuyên gia đào tạo bộ môn {classItem.sport}
+                  <Typography variant="caption" color="text.secondary" sx={{ display: 'block' }}>
+                    Bộ môn: {classItem.sport}
                   </Typography>
+                  {classItem.trainerPhone && (
+                    <Typography variant="caption" color="text.secondary">
+                      Liên hệ: {classItem.trainerPhone}
+                    </Typography>
+                  )}
                 </Box>
               </Box>
 
-              {/* Slot Progress */}
-              <Box sx={{ mt: 3 }}>
-                <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 0.8 }}>
-                  <Typography variant="body2" sx={{ fontWeight: 600 }}>
-                    Tình trạng chỗ:
+              {/* Schedules from API */}
+              <Box sx={{ mt: 2.5 }}>
+                <Typography variant="subtitle2" color="text.secondary" sx={{ fontWeight: 700, mb: 1 }}>
+                  LỊCH HỌC DỰ KIẾN ({schedules.length} buổi):
+                </Typography>
+                {loadingSchedules ? (
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, py: 1 }}>
+                    <CircularProgress size={18} />
+                    <Typography variant="caption">Đang tải lịch từ backend...</Typography>
+                  </Box>
+                ) : schedules.length > 0 ? (
+                  <List dense disablePadding sx={{ bgcolor: '#F8FAFC', borderRadius: 2, p: 1 }}>
+                    {schedules.map((sch) => (
+                      <ListItem key={sch.scheduleId} disableGutters sx={{ py: 0.5 }}>
+                        <ListItemIcon sx={{ minWidth: 28 }}>
+                          <CalendarIcon fontSize="small" color="primary" />
+                        </ListItemIcon>
+                        <ListItemText
+                          primary={
+                            <Typography variant="body2" sx={{ fontWeight: 600 }}>
+                              {sch.classDate}: {sch.startDatetime ? new Date(sch.startDatetime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : ''} -{' '}
+                              {sch.endDatetime ? new Date(sch.endDatetime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : ''}
+                            </Typography>
+                          }
+                        />
+                      </ListItem>
+                    ))}
+                  </List>
+                ) : (
+                  <Typography variant="caption" color="text.secondary">
+                    Chưa có lịch học cố định hoặc lớp đang cập nhật lịch mới.
                   </Typography>
-                  <Typography variant="body2" sx={{ fontWeight: 700, color: availableSlots <= 2 ? 'error.main' : 'primary.main' }}>
-                    Còn {availableSlots}/{classItem.capacity} slot
-                  </Typography>
-                </Box>
-                <LinearProgress
-                  variant="determinate"
-                  value={progressPercent}
-                  color={availableSlots <= 2 ? 'warning' : 'primary'}
-                  sx={{ height: 8, borderRadius: 4 }}
-                />
+                )}
               </Box>
             </Grid>
 
-            {/* Right Col: Quick Booking Form */}
+            {/* Right Col: Register & Authenticated Action */}
             <Grid size={{ xs: 12, md: 6 }}>
               <Box
-                component="form"
-                onSubmit={handleSubmit}
                 sx={{
                   p: 3,
                   bgcolor: '#F8FAFC',
                   borderRadius: 3,
                   border: '1px solid #E2E8F0',
+                  height: '100%',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  justifyContent: 'space-between',
                 }}
               >
-                <Typography variant="h6" sx={{ fontWeight: 800, mb: 0.5 }}>
-                  Đăng Ký Học Thử Miễn Phí
-                </Typography>
-                <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 2 }}>
-                  Trải nghiệm 01 buổi tập cùng HLV chuyên nghiệp hoàn toàn miễn phí.
-                </Typography>
+                <Box>
+                  <Typography variant="h6" sx={{ fontWeight: 800, mb: 1 }}>
+                    Xác Thực & Đăng Ký Lớp
+                  </Typography>
+                  <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+                    Chức năng yêu cầu gửi <strong>Bearer Token</strong> (Header: <code>Authorization</code>) tới endpoint:{' '}
+                    <code>POST /api/classes/{classItem.id}/register</code>
+                  </Typography>
 
-                <Stack spacing={2}>
-                  <TextField
-                    required
-                    fullWidth
-                    size="small"
-                    label="Họ và tên"
-                    name="fullName"
-                    value={formData.fullName}
-                    onChange={handleChange}
-                    placeholder="Ví dụ: Nguyễn Văn A"
-                  />
-                  <TextField
-                    required
-                    fullWidth
-                    size="small"
-                    label="Số điện thoại"
-                    name="phone"
-                    value={formData.phone}
-                    onChange={handleChange}
-                    placeholder="Ví dụ: 0912 345 678"
-                  />
-                  <TextField
-                    fullWidth
-                    size="small"
-                    type="email"
-                    label="Email nhận vé tập"
-                    name="email"
-                    value={formData.email}
-                    onChange={handleChange}
-                    placeholder="email@example.com"
-                  />
-                  <TextField
-                    fullWidth
-                    size="small"
-                    type="date"
-                    label="Ngày bạn muốn tập thử"
-                    name="date"
-                    value={formData.date}
-                    onChange={handleChange}
-                    InputLabelProps={{ shrink: true }}
-                  />
-                  <TextField
-                    fullWidth
-                    size="small"
-                    multiline
-                    rows={2}
-                    label="Ghi chú thể lực (nếu có)"
-                    name="note"
-                    value={formData.note}
-                    onChange={handleChange}
-                    placeholder="Tiền sử chấn thương, mục tiêu muốn giảm cân/tăng cơ..."
-                  />
+                  {errorMessage && (
+                    <Alert severity="error" sx={{ mb: 2.5 }}>
+                      {errorMessage}
+                    </Alert>
+                  )}
 
-                  <Button
-                    type="submit"
-                    variant="contained"
-                    color="secondary"
-                    size="large"
-                    disabled={classItem.status === 'Đã đủ chỗ'}
-                    sx={{
-                      fontWeight: 700,
-                      py: 1.2,
-                      boxShadow: '0 4px 14px rgba(255, 107, 53, 0.35)',
-                    }}
-                  >
-                    {classItem.status === 'Đã đủ chỗ' ? 'Lớp Đã Đủ Số Lượng' : 'Xác Nhận Giữ Chỗ Học Thử'}
-                  </Button>
-                </Stack>
+                  {!isAuthenticated ? (
+                    <Alert severity="warning" icon={<WarningIcon />} sx={{ mb: 2.5 }}>
+                      <Typography variant="body2" sx={{ fontWeight: 600, mb: 0.5 }}>
+                        Bạn chưa đăng nhập
+                      </Typography>
+                      <Typography variant="caption" sx={{ display: 'block' }}>
+                        Để đăng ký giữ chỗ chính thức trong hệ thống trung tâm, vui lòng đăng nhập tài khoản Hội viên (Member).
+                      </Typography>
+                    </Alert>
+                  ) : !isMember ? (
+                    <Alert severity="info" sx={{ mb: 2.5 }}>
+                      Bạn đang đăng nhập với tài khoản <strong>{user?.fullName}</strong> có vai trò{' '}
+                      <strong>{user?.role}</strong>. Chỉ tài khoản Hội viên (Member) mới được đăng ký lớp.
+                    </Alert>
+                  ) : (
+                    <Box sx={{ p: 2, bgcolor: '#FFFFFF', borderRadius: 2, border: '1px solid #E2E8F0', mb: 2.5 }}>
+                      <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 700, display: 'block', mb: 1 }}>
+                        THÔNG TIN HỘI VIÊN ĐĂNG KÝ:
+                      </Typography>
+                      <Stack spacing={0.8}>
+                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                          <PersonIcon sx={{ fontSize: 18, color: 'primary.main' }} />
+                          <Typography variant="body2">
+                            <strong>Họ tên:</strong> {user?.fullName} (@{user?.username})
+                          </Typography>
+                        </Box>
+                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                          <PhoneIcon sx={{ fontSize: 18, color: 'secondary.main' }} />
+                          <Typography variant="body2">
+                            <strong>Số điện thoại:</strong> {user?.phone}
+                          </Typography>
+                        </Box>
+                      </Stack>
+                    </Box>
+                  )}
+                </Box>
+
+                <Box sx={{ mt: 2 }}>
+                  {!isAuthenticated ? (
+                    <Button
+                      fullWidth
+                      variant="contained"
+                      color="primary"
+                      size="large"
+                      startIcon={<LoginIcon />}
+                      onClick={() => navigate('/login', { state: { from: '/classes' } })}
+                      sx={{ py: 1.4, fontWeight: 700 }}
+                    >
+                      Đăng Nhập Để Đăng Ký Lớp
+                    </Button>
+                  ) : (
+                    <Button
+                      fullWidth
+                      variant="contained"
+                      color="secondary"
+                      size="large"
+                      disabled={submitting || !isMember || classItem.rawStatus === 'Cancelled'}
+                      onClick={handleRegister}
+                      sx={{
+                        py: 1.4,
+                        fontWeight: 700,
+                        boxShadow: '0 4px 14px rgba(255, 107, 53, 0.35)',
+                      }}
+                    >
+                      {submitting ? (
+                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                          <CircularProgress size={20} color="inherit" />
+                          <span>Đang gửi token & đăng ký...</span>
+                        </Box>
+                      ) : classItem.rawStatus === 'Cancelled' ? (
+                        'Lớp Đã Hủy'
+                      ) : (
+                        'Xác Nhận Đăng Ký Lớp Này'
+                      )}
+                    </Button>
+                  )}
+                </Box>
               </Box>
             </Grid>
           </Grid>

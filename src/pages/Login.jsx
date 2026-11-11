@@ -13,11 +13,12 @@ import {
   Alert,
   Stack,
   Chip,
+  CircularProgress,
 } from '@mui/material';
 import {
   Visibility,
   VisibilityOff,
-  Email as EmailIcon,
+  Phone as PhoneIcon,
   Lock as LockIcon,
   FitnessCenter as FitnessCenterIcon,
   Google as GoogleIcon,
@@ -25,18 +26,22 @@ import {
   Apple as AppleIcon,
   CheckCircle as CheckCircleIcon,
 } from '@mui/icons-material';
-import { Link as RouterLink, useNavigate } from 'react-router-dom';
+import { Link as RouterLink, useNavigate, useLocation } from 'react-router-dom';
+import { useAuth } from '../context/AuthContext';
 
 const Login = () => {
   const navigate = useNavigate();
+  const location = useLocation();
+  const { login } = useAuth();
+
   const [formData, setFormData] = useState({
-    email: '',
+    phone: '',
     password: '',
     rememberMe: true,
   });
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState('');
-  const [success, setSuccess] = useState(false);
+  const [successMsg, setSuccessMsg] = useState('');
   const [loading, setLoading] = useState(false);
 
   const handleChange = (e) => {
@@ -48,34 +53,67 @@ const Login = () => {
     if (error) setError('');
   };
 
-  const handleQuickLogin = (email, pass) => {
+  const handleQuickLogin = (phone, pass) => {
     setFormData({
       ...formData,
-      email: email,
+      phone: phone,
       password: pass,
     });
+    if (error) setError('');
   };
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!formData.email || !formData.password) {
-      setError('Vui lòng nhập đầy đủ Email và Mật khẩu.');
+    const phoneClean = formData.phone.trim();
+    if (!phoneClean || !formData.password) {
+      setError('Vui lòng nhập đầy đủ Số điện thoại và Mật khẩu.');
       return;
     }
 
-    if (!formData.email.includes('@')) {
-      setError('Định dạng email không hợp lệ.');
+    const phoneRegex = /^\d{10,11}$/;
+    if (!phoneRegex.test(phoneClean)) {
+      setError('Số điện thoại phải từ 10 - 11 chữ số (ví dụ: 0901000005).');
       return;
     }
 
     setLoading(true);
-    setTimeout(() => {
-      setLoading(false);
-      setSuccess(true);
+    setError('');
+
+    try {
+      const res = await login({
+        phone: phoneClean,
+        password: formData.password,
+      });
+
+      const user = res.data;
+      const roleText =
+        user?.role === 'Manager'
+          ? 'Quản lý'
+          : user?.role === 'Coach'
+          ? 'Huấn luyện viên'
+          : user?.role === 'Receptionist'
+          ? 'Lễ tân'
+          : 'Hội viên';
+      setSuccessMsg(`Đăng nhập thành công! Chào mừng ${user?.fullName || ''} (${roleText}).`);
+
+      const roleHomeMap = {
+        Manager: '/admin',
+        Coach: '/coach',
+        Receptionist: '/reception',
+        Member: '/member',
+      };
+
+      const defaultHome = roleHomeMap[user?.role] || '/';
+      const returnUrl = location.state?.from?.pathname || location.state?.from || defaultHome;
+
       setTimeout(() => {
-        navigate('/');
-      }, 1500);
-    }, 800);
+        navigate(returnUrl);
+      }, 1000);
+    } catch (err) {
+      setError(err.message || 'Đăng nhập không thành công. Vui lòng kiểm tra lại số điện thoại hoặc mật khẩu.');
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -172,7 +210,7 @@ const Login = () => {
           <Box sx={{ maxWidth: 460, width: '100%', mx: 'auto' }}>
             <Box sx={{ mb: 4 }}>
               <Chip
-                label="CỔNG THÀNH VIÊN"
+                label="CỔNG ĐĂNG NHẬP HỆ THỐNG"
                 size="small"
                 sx={{
                   bgcolor: 'rgba(25, 118, 210, 0.1)',
@@ -186,32 +224,50 @@ const Login = () => {
                 Chào Mừng Trở Lại!
               </Typography>
               <Typography variant="body2" color="text.secondary">
-                Đăng nhập để theo dõi lịch tập, đặt chỗ lớp học và quản lý gói hội viên.
+                Đăng nhập bằng số điện thoại để đặt chỗ lớp học, theo dõi gói tập và lịch trình.
               </Typography>
             </Box>
 
-            {/* Quick Demo Fill Buttons */}
+            {/* Quick Demo Fill Buttons with Database Accounts */}
             <Box sx={{ p: 2, bgcolor: '#F1F5F9', borderRadius: 3, mb: 3 }}>
               <Typography variant="caption" sx={{ fontWeight: 700, color: 'text.secondary', display: 'block', mb: 1 }}>
-                ⚡ TÀI KHOẢN MẪU DÙNG THỬ NHANH:
+                ⚡ TÀI KHOẢN MẪU TỪ HỆ THỐNG (MẬT KHẨU: 123456):
               </Typography>
-              <Stack direction="row" spacing={1}>
+              <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap>
                 <Button
                   size="small"
                   variant="outlined"
-                  onClick={() => handleQuickLogin('member@aurasport.vn', '123456')}
+                  onClick={() => handleQuickLogin('0901000005', '123456')}
                   sx={{ fontSize: '0.75rem', py: 0.5 }}
                 >
-                  Hội Viên (Member)
+                  Hội Viên (0901000005)
                 </Button>
                 <Button
                   size="small"
                   variant="outlined"
                   color="secondary"
-                  onClick={() => handleQuickLogin('trainer@aurasport.vn', '123456')}
+                  onClick={() => handleQuickLogin('0901000003', '123456')}
                   sx={{ fontSize: '0.75rem', py: 0.5 }}
                 >
-                  Huấn Luyện Viên (Trainer)
+                  HLV (0901000003)
+                </Button>
+                <Button
+                  size="small"
+                  variant="outlined"
+                  color="info"
+                  onClick={() => handleQuickLogin('0901000001', '123456')}
+                  sx={{ fontSize: '0.75rem', py: 0.5 }}
+                >
+                  Quản Lý (0901000001)
+                </Button>
+                <Button
+                  size="small"
+                  variant="outlined"
+                  color="warning"
+                  onClick={() => handleQuickLogin('0901000002', '123456')}
+                  sx={{ fontSize: '0.75rem', py: 0.5 }}
+                >
+                  Lễ Tân (0901000002)
                 </Button>
               </Stack>
             </Box>
@@ -222,27 +278,30 @@ const Login = () => {
               </Alert>
             )}
 
-            {success && (
+            {successMsg && (
               <Alert severity="success" icon={<CheckCircleIcon />} sx={{ mb: 3 }}>
-                Đăng nhập thành công! Đang chuyển hướng về trang chủ...
+                {successMsg}
               </Alert>
             )}
 
             <Box component="form" onSubmit={handleSubmit}>
               <Stack spacing={2.5}>
+                {/* Phone Field (replacing email) */}
                 <TextField
+                  required
                   fullWidth
-                  label="Email của bạn"
-                  name="email"
-                  type="email"
-                  value={formData.email}
+                  label="Số điện thoại đăng nhập"
+                  name="phone"
+                  type="tel"
+                  value={formData.phone}
                   onChange={handleChange}
-                  placeholder="name@example.com"
+                  placeholder="Ví dụ: 0901000005 (10-11 số)"
+                  helperText="Đăng nhập bằng số điện thoại đã đăng ký với trung tâm"
                   slotProps={{
                     input: {
                       startAdornment: (
                         <InputAdornment position="start">
-                          <EmailIcon sx={{ color: 'text.secondary', fontSize: 20 }} />
+                          <PhoneIcon sx={{ color: 'text.secondary', fontSize: 20 }} />
                         </InputAdornment>
                       ),
                     },
@@ -250,6 +309,7 @@ const Login = () => {
                 />
 
                 <TextField
+                  required
                   fullWidth
                   label="Mật khẩu"
                   name="password"
@@ -309,7 +369,7 @@ const Login = () => {
                   variant="contained"
                   color="primary"
                   size="large"
-                  disabled={loading || success}
+                  disabled={loading || Boolean(successMsg)}
                   sx={{
                     py: 1.5,
                     fontWeight: 700,
@@ -317,44 +377,55 @@ const Login = () => {
                     boxShadow: '0 6px 16px rgba(25, 118, 210, 0.35)',
                   }}
                 >
-                  {loading ? 'Đang xác thực...' : 'Đăng Nhập'}
+                  {loading ? (
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                      <CircularProgress size={20} color="inherit" />
+                      <span>Đang xác thực...</span>
+                    </Box>
+                  ) : (
+                    'Đăng Nhập'
+                  )}
                 </Button>
               </Stack>
             </Box>
 
-            {/* Social Logins */}
+            {/* Social Logins - Disabled as Backend lacks OAuth */}
             <Box sx={{ my: 3 }}>
               <Divider sx={{ '&::before, &::after': { borderColor: '#E2E8F0' } }}>
                 <Typography variant="caption" sx={{ color: 'text.secondary', px: 1 }}>
-                  HOẶC TIẾP TỤC VỚI
+                  ĐĂNG NHẬP MẠNG XÃ HỘI
                 </Typography>
               </Divider>
 
-              <Stack direction="row" spacing={1.5} sx={{ mt: 2.5 }}>
+              <Typography variant="caption" sx={{ color: 'text.secondary', display: 'block', textAlign: 'center', mt: 1, fontStyle: 'italic' }}>
+                (Chưa khả dụng - Backend SCMS chưa hỗ trợ cổng OAuth2)
+              </Typography>
+
+              <Stack direction="row" spacing={1.5} sx={{ mt: 1.5 }}>
                 <Button
                   fullWidth
+                  disabled
                   variant="outlined"
-                  startIcon={<GoogleIcon sx={{ color: '#EA4335' }} />}
-                  sx={{ py: 1, borderColor: '#CBD5E1', color: 'text.primary', fontWeight: 600 }}
-                  onClick={() => alert('Chức năng đăng nhập Google (Mock UI)')}
+                  startIcon={<GoogleIcon />}
+                  sx={{ py: 1, borderColor: '#CBD5E1', fontWeight: 600 }}
                 >
                   Google
                 </Button>
                 <Button
                   fullWidth
+                  disabled
                   variant="outlined"
-                  startIcon={<FacebookIcon sx={{ color: '#1877F2' }} />}
-                  sx={{ py: 1, borderColor: '#CBD5E1', color: 'text.primary', fontWeight: 600 }}
-                  onClick={() => alert('Chức năng đăng nhập Facebook (Mock UI)')}
+                  startIcon={<FacebookIcon />}
+                  sx={{ py: 1, borderColor: '#CBD5E1', fontWeight: 600 }}
                 >
                   Facebook
                 </Button>
                 <Button
                   fullWidth
+                  disabled
                   variant="outlined"
-                  startIcon={<AppleIcon sx={{ color: '#000000' }} />}
-                  sx={{ py: 1, borderColor: '#CBD5E1', color: 'text.primary', fontWeight: 600 }}
-                  onClick={() => alert('Chức năng đăng nhập Apple (Mock UI)')}
+                  startIcon={<AppleIcon />}
+                  sx={{ py: 1, borderColor: '#CBD5E1', fontWeight: 600 }}
                 >
                   Apple
                 </Button>

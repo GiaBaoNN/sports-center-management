@@ -1,62 +1,25 @@
-import React, { useState, useEffect } from 'react';
+import React from 'react';
 import {
   Box,
   Container,
   Paper,
   Typography,
-  TextField,
   Button,
-  InputAdornment,
   Alert,
   Stack,
   Chip,
+  Divider,
 } from '@mui/material';
 import {
-  Email as EmailIcon,
-  MarkEmailRead as MarkEmailReadIcon,
   ArrowBack as ArrowBackIcon,
-  Refresh as RefreshIcon,
+  PhoneInTalk as PhoneIcon,
+  Storefront as ReceptionIcon,
   FitnessCenter as FitnessCenterIcon,
+  Info as InfoIcon,
 } from '@mui/icons-material';
 import { Link as RouterLink } from 'react-router-dom';
 
 const ForgotPassword = () => {
-  const [email, setEmail] = useState('');
-  const [touched, setTouched] = useState(false);
-  const [isSent, setIsSent] = useState(false);
-  const [countdown, setCountdown] = useState(60);
-  const [canResend, setCanResend] = useState(false);
-
-  const isValidEmail = /^[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}$/i.test(email);
-
-  useEffect(() => {
-    let timer;
-    if (isSent && countdown > 0) {
-      timer = setInterval(() => {
-        setCountdown((prev) => prev - 1);
-      }, 1000);
-    } else if (countdown === 0) {
-      setCanResend(true);
-    }
-    return () => clearInterval(timer);
-  }, [isSent, countdown]);
-
-  const handleSubmit = (e) => {
-    e.preventDefault();
-    setTouched(true);
-    if (!isValidEmail) return;
-
-    setIsSent(true);
-    setCountdown(60);
-    setCanResend(false);
-  };
-
-  const handleResend = () => {
-    if (!canResend) return;
-    setCountdown(60);
-    setCanResend(false);
-  };
-
   return (
     <Box
       sx={{
@@ -84,8 +47,8 @@ const ForgotPassword = () => {
           {/* Logo badge */}
           <Box
             sx={{
-              width: 52,
-              height: 52,
+              width: 56,
+              height: 56,
               borderRadius: 3,
               background: 'linear-gradient(135deg, #1976D2 0%, #FF6B35 100%)',
               display: 'inline-flex',
@@ -95,141 +58,85 @@ const ForgotPassword = () => {
               mb: 3,
             }}
           >
-            <FitnessCenterIcon sx={{ fontSize: 28 }} />
+            <FitnessCenterIcon sx={{ fontSize: 30 }} />
           </Box>
 
-          {!isSent ? (
-            /* STEP 1: INPUT EMAIL */
-            <Box>
-              <Chip
-                label="HỖ TRỢ TÀI KHOẢN"
-                size="small"
-                sx={{
-                  bgcolor: 'rgba(25, 118, 210, 0.1)',
-                  color: 'primary.main',
-                  fontWeight: 800,
-                  fontSize: '0.75rem',
-                  mb: 1.5,
-                }}
-              />
-              <Typography variant="h4" sx={{ fontWeight: 800, color: 'text.primary', mb: 1 }}>
-                Quên Mật Khẩu?
-              </Typography>
-              <Typography variant="body2" color="text.secondary" sx={{ maxWidth: 420, mx: 'auto', mb: 4, lineHeight: 1.6 }}>
-                Đừng lo lắng! Nhập địa chỉ email liên kết với tài khoản hội viên của bạn, chúng tôi sẽ gửi liên kết để đặt lại mật khẩu an toàn.
-              </Typography>
-
-              <Box component="form" onSubmit={handleSubmit} noValidate>
-                <TextField
-                  fullWidth
-                  label="Email của bạn"
-                  type="email"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  onBlur={() => setTouched(true)}
-                  error={Boolean(touched && !isValidEmail)}
-                  helperText={touched && !isValidEmail ? 'Vui lòng nhập định dạng email hợp lệ' : ''}
-                  placeholder="name@example.com"
-                  sx={{ mb: 3 }}
-                  slotProps={{
-                    input: {
-                      startAdornment: (
-                        <InputAdornment position="start">
-                          <EmailIcon sx={{ color: 'text.secondary' }} />
-                        </InputAdornment>
-                      ),
-                    },
-                  }}
-                />
-
-                <Button
-                  type="submit"
-                  fullWidth
-                  variant="contained"
-                  color="primary"
-                  size="large"
-                  disabled={!email || (touched && !isValidEmail)}
-                  sx={{
-                    py: 1.4,
-                    fontWeight: 700,
-                    fontSize: '1rem',
-                    boxShadow: '0 6px 18px rgba(25, 118, 210, 0.35)',
-                    mb: 3,
-                  }}
-                >
-                  Gửi Liên Kết Đặt Lại Mật Khẩu
-                </Button>
-              </Box>
-            </Box>
-          ) : (
-            /* STEP 2: EMAIL SENT CONFIRMATION */
-            <Box>
-              <Box
-                sx={{
-                  width: 72,
-                  height: 72,
-                  borderRadius: '50%',
-                  bgcolor: 'rgba(46, 125, 50, 0.1)',
-                  color: 'success.main',
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  mb: 2.5,
-                }}
-              >
-                <MarkEmailReadIcon sx={{ fontSize: 40 }} />
-              </Box>
-
-              <Typography variant="h4" sx={{ fontWeight: 800, color: 'text.primary', mb: 1 }}>
-                Email Đã Được Gửi!
-              </Typography>
-
-              <Typography variant="body2" color="text.secondary" sx={{ maxWidth: 440, mx: 'auto', mb: 3, lineHeight: 1.7 }}>
-                Chúng tôi đã gửi hướng dẫn đặt lại mật khẩu tới hộp thư:{' '}
-                <strong style={{ color: '#0F172A' }}>{email}</strong>. Vui lòng kiểm tra hòm thư chính và cả mục Spam/Thư rác.
-              </Typography>
-
-              <Alert severity="info" sx={{ textAlign: 'left', mb: 4, borderRadius: 2 }}>
-                Liên kết bảo mật sẽ có hiệu lực trong vòng <strong>15 phút</strong>. Sau thời gian này bạn cần yêu cầu gửi lại liên kết mới.
-              </Alert>
-
-              <Stack spacing={2}>
-                <Button
-                  variant="outlined"
-                  color="primary"
-                  fullWidth
-                  disabled={!canResend}
-                  onClick={handleResend}
-                  startIcon={<RefreshIcon />}
-                  sx={{ py: 1.2, fontWeight: 700 }}
-                >
-                  {canResend ? 'Gửi Lại Email Ngay' : `Gửi lại sau (${countdown}s)`}
-                </Button>
-
-                <Button
-                  variant="text"
-                  color="inherit"
-                  fullWidth
-                  onClick={() => setIsSent(false)}
-                  sx={{ fontWeight: 600 }}
-                >
-                  Nhập địa chỉ email khác
-                </Button>
-              </Stack>
-            </Box>
-          )}
-
-          {/* Back to Login link */}
-          <Box sx={{ mt: 4, pt: 3, borderTop: '1px solid #F1F5F9' }}>
-            <Button
-              component={RouterLink}
-              to="/login"
-              startIcon={<ArrowBackIcon />}
-              sx={{ color: 'text.secondary', fontWeight: 600 }}
-            >
-              Quay lại Đăng nhập
-            </Button>
+          <Box sx={{ mb: 3 }}>
+            <Chip
+              label="HỖ TRỢ TÀI KHOẢN & MẬT KHẨU"
+              size="small"
+              sx={{
+                bgcolor: 'rgba(255, 107, 53, 0.1)',
+                color: 'secondary.main',
+                fontWeight: 800,
+                fontSize: '0.75rem',
+                mb: 1.5,
+              }}
+            />
+            <Typography variant="h4" sx={{ fontWeight: 800, color: 'text.primary', mb: 1 }}>
+              Khôi Phục Mật Khẩu
+            </Typography>
+            <Typography variant="body2" color="text.secondary">
+              Thông tin hướng dẫn cấp lại mật khẩu truy cập hệ thống SCMS.
+            </Typography>
           </Box>
+
+          {/* Backend limitation alert */}
+          <Alert severity="warning" icon={<InfoIcon />} sx={{ textAlign: 'left', mb: 3 }}>
+            <Typography variant="subtitle2" sx={{ fontWeight: 700, mb: 0.5 }}>
+              Tính năng trực tuyến chưa khả dụng
+            </Typography>
+            <Typography variant="body2">
+              Hệ thống API backend hiện tại chưa hỗ trợ khôi phục mật khẩu tự động qua Email hoặc SMS OTP. Để bảo đảm an toàn thông tin tài khoản, xin vui lòng thực hiện theo hướng dẫn bên dưới.
+            </Typography>
+          </Alert>
+
+          <Paper elevation={0} sx={{ p: 3, bgcolor: '#F8FAFC', borderRadius: 3, border: '1px solid #E2E8F0', textAlign: 'left', mb: 3 }}>
+            <Typography variant="subtitle2" sx={{ fontWeight: 800, color: 'text.primary', mb: 1.5 }}>
+              HƯỚNG DẪN CẤP LẠI MẬT KHẨU:
+            </Typography>
+
+            <Stack spacing={2}>
+              <Box sx={{ display: 'flex', gap: 1.5 }}>
+                <ReceptionIcon color="primary" sx={{ mt: 0.3 }} />
+                <Box>
+                  <Typography variant="body2" sx={{ fontWeight: 700 }}>
+                    1. Đến trực tiếp quầy Lễ tân
+                  </Typography>
+                  <Typography variant="caption" color="text.secondary">
+                    Mang theo CMND/CCCD hoặc cung cấp số điện thoại đã đăng ký để nhân viên lễ tân xác minh và cấp lại mật khẩu mới tại quầy.
+                  </Typography>
+                </Box>
+              </Box>
+
+              <Divider />
+
+              <Box sx={{ display: 'flex', gap: 1.5 }}>
+                <PhoneIcon color="secondary" sx={{ mt: 0.3 }} />
+                <Box>
+                  <Typography variant="body2" sx={{ fontWeight: 700 }}>
+                    2. Liên hệ Hotline hỗ trợ
+                  </Typography>
+                  <Typography variant="caption" color="text.secondary">
+                    Gọi tới tổng đài <strong>1900 8888</strong> (08:00 - 21:00 hàng ngày) để được nhân viên chăm sóc khách hàng hướng dẫn.
+                  </Typography>
+                </Box>
+              </Box>
+            </Stack>
+          </Paper>
+
+          <Button
+            component={RouterLink}
+            to="/login"
+            fullWidth
+            variant="contained"
+            color="primary"
+            size="large"
+            startIcon={<ArrowBackIcon />}
+            sx={{ fontWeight: 700, py: 1.3 }}
+          >
+            Quay Lại Trang Đăng Nhập
+          </Button>
         </Paper>
       </Container>
     </Box>

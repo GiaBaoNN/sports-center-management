@@ -19,6 +19,7 @@ import {
   Visibility,
   VisibilityOff,
   Person as PersonIcon,
+  Badge as BadgeIcon,
   Email as EmailIcon,
   Phone as PhoneIcon,
   Lock as LockIcon,
@@ -26,10 +27,14 @@ import {
   CheckCircle as CheckCircleIcon,
 } from '@mui/icons-material';
 import { Link as RouterLink, useNavigate } from 'react-router-dom';
+import { useAuth } from '../context/AuthContext';
 
 const Register = () => {
   const navigate = useNavigate();
+  const { register } = useAuth();
+
   const [formData, setFormData] = useState({
+    username: '',
     fullName: '',
     email: '',
     phone: '',
@@ -42,20 +47,30 @@ const Register = () => {
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [serverError, setServerError] = useState('');
   const [isSuccess, setIsSuccess] = useState(false);
 
-  // Realtime Validation Logic
+  // Realtime Validation Logic matching backend constraints
   const errors = {
-    fullName: !formData.fullName.trim() ? 'Vui lòng nhập họ và tên của bạn' : '',
-    email: !formData.email
-      ? 'Vui lòng nhập địa chỉ email'
-      : !/^[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}$/i.test(formData.email)
-      ? 'Địa chỉ email không hợp lệ (ví dụ: name@domain.com)'
+    username: !formData.username.trim()
+      ? 'Vui lòng nhập tên tài khoản (Username)'
+      : formData.username.trim().length < 3 || formData.username.trim().length > 50
+      ? 'Username phải từ 3 đến 50 ký tự'
+      : !/^[a-zA-Z0-9_.-]+$/.test(formData.username.trim())
+      ? 'Username chỉ được gồm chữ cái, chữ số, gạch dưới (_) hoặc gạch ngang (-)'
+      : '',
+    fullName: !formData.fullName.trim()
+      ? 'Vui lòng nhập họ và tên của bạn'
+      : formData.fullName.trim().length > 100
+      ? 'Họ và tên tối đa 100 ký tự'
       : '',
     phone: !formData.phone
       ? 'Vui lòng nhập số điện thoại'
-      : !/(84|0[3|5|7|8|9])+([0-9]{8})\b/.test(formData.phone)
-      ? 'Số điện thoại không đúng định dạng VN (10 chữ số)'
+      : !/^\d{10,11}$/.test(formData.phone.trim())
+      ? 'Số điện thoại phải từ 10 - 11 chữ số (ví dụ: 0901000005)'
+      : '',
+    email: formData.email && !/^[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}$/i.test(formData.email)
+      ? 'Địa chỉ email không hợp lệ (ví dụ: name@domain.com)'
       : '',
     password: !formData.password
       ? 'Vui lòng thiết lập mật khẩu'
@@ -78,16 +93,18 @@ const Register = () => {
       ...prev,
       [name]: type === 'checkbox' ? checked : value,
     }));
+    if (serverError) setServerError('');
   };
 
   const handleBlur = (field) => {
     setTouched((prev) => ({ ...prev, [field]: true }));
   };
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
     // Mark all touched
     setTouched({
+      username: true,
       fullName: true,
       email: true,
       phone: true,
@@ -99,13 +116,26 @@ const Register = () => {
     if (hasErrors) return;
 
     setIsSubmitting(true);
-    setTimeout(() => {
-      setIsSubmitting(false);
+    setServerError('');
+
+    try {
+      await register({
+        username: formData.username.trim(),
+        password: formData.password,
+        fullName: formData.fullName.trim(),
+        email: formData.email.trim() || null,
+        phone: formData.phone.trim(),
+      });
+
       setIsSuccess(true);
       setTimeout(() => {
-        navigate('/login');
-      }, 2000);
-    }, 1000);
+        navigate('/');
+      }, 1500);
+    } catch (err) {
+      setServerError(err.message || 'Đăng ký không thành công. Tên tài khoản hoặc số điện thoại có thể đã tồn tại.');
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
@@ -193,10 +223,10 @@ const Register = () => {
             bgcolor: '#FFFFFF',
           }}
         >
-          <Box sx={{ maxWidth: 520, width: '100%', mx: 'auto' }}>
+          <Box sx={{ maxWidth: 560, width: '100%', mx: 'auto' }}>
             <Box sx={{ mb: 4 }}>
               <Chip
-                label="ĐĂNG KÝ HỘI VIÊN"
+                label="ĐĂNG KÝ HỘI VIÊN MỚI"
                 size="small"
                 sx={{
                   bgcolor: 'rgba(255, 107, 53, 0.1)',
@@ -210,61 +240,44 @@ const Register = () => {
                 Tạo Tài Khoản Mới
               </Typography>
               <Typography variant="body2" color="text.secondary">
-                Điền thông tin bên dưới để đăng ký thẻ hội viên AURA SPORT.
+                Điền đầy đủ thông tin bên dưới để đăng ký thẻ hội viên AURA SPORT.
               </Typography>
             </Box>
 
+            {serverError && (
+              <Alert severity="error" sx={{ mb: 3 }}>
+                {serverError}
+              </Alert>
+            )}
+
             {isSuccess && (
               <Alert severity="success" icon={<CheckCircleIcon />} sx={{ mb: 3 }}>
-                Đăng ký tài khoản thành công! Đang chuyển hướng bạn sang trang Đăng nhập...
+                Đăng ký tài khoản thành công! Hệ thống đang tự động đăng nhập và đưa bạn về trang chủ...
               </Alert>
             )}
 
             <Box component="form" onSubmit={handleSubmit} noValidate>
               <Stack spacing={2.5}>
-                {/* Full Name */}
-                <TextField
-                  required
-                  fullWidth
-                  label="Họ và tên đầy đủ"
-                  name="fullName"
-                  value={formData.fullName}
-                  onChange={handleChange}
-                  onBlur={() => handleBlur('fullName')}
-                  error={Boolean(touched.fullName && errors.fullName)}
-                  helperText={touched.fullName && errors.fullName}
-                  placeholder="Ví dụ: Nguyễn Văn Hoàng"
-                  slotProps={{
-                    input: {
-                      startAdornment: (
-                        <InputAdornment position="start">
-                          <PersonIcon sx={{ color: 'text.secondary', fontSize: 20 }} />
-                        </InputAdornment>
-                      ),
-                    },
-                  }}
-                />
-
+                {/* Row 1: Username & Full Name */}
                 <Grid container spacing={2}>
-                  {/* Email */}
+                  {/* Username (Mandatory in RegisterRequest.java) */}
                   <Grid size={{ xs: 12, sm: 6 }}>
                     <TextField
                       required
                       fullWidth
-                      label="Địa chỉ Email"
-                      name="email"
-                      type="email"
-                      value={formData.email}
+                      label="Tên đăng nhập (Username)"
+                      name="username"
+                      value={formData.username}
                       onChange={handleChange}
-                      onBlur={() => handleBlur('email')}
-                      error={Boolean(touched.email && errors.email)}
-                      helperText={touched.email && errors.email}
-                      placeholder="name@example.com"
+                      onBlur={() => handleBlur('username')}
+                      error={Boolean(touched.username && errors.username)}
+                      helperText={touched.username && errors.username}
+                      placeholder="Ví dụ: hoangnv99 (3-50 ký tự)"
                       slotProps={{
                         input: {
                           startAdornment: (
                             <InputAdornment position="start">
-                              <EmailIcon sx={{ color: 'text.secondary', fontSize: 20 }} />
+                              <BadgeIcon sx={{ color: 'text.secondary', fontSize: 20 }} />
                             </InputAdornment>
                           ),
                         },
@@ -272,19 +285,48 @@ const Register = () => {
                     />
                   </Grid>
 
-                  {/* Phone */}
+                  {/* Full Name */}
+                  <Grid size={{ xs: 12, sm: 6 }}>
+                    <TextField
+                      required
+                      fullWidth
+                      label="Họ và tên đầy đủ"
+                      name="fullName"
+                      value={formData.fullName}
+                      onChange={handleChange}
+                      onBlur={() => handleBlur('fullName')}
+                      error={Boolean(touched.fullName && errors.fullName)}
+                      helperText={touched.fullName && errors.fullName}
+                      placeholder="Ví dụ: Nguyễn Văn Hoàng"
+                      slotProps={{
+                        input: {
+                          startAdornment: (
+                            <InputAdornment position="start">
+                              <PersonIcon sx={{ color: 'text.secondary', fontSize: 20 }} />
+                            </InputAdornment>
+                          ),
+                        },
+                      }}
+                    />
+                  </Grid>
+                </Grid>
+
+                {/* Row 2: Phone & Email */}
+                <Grid container spacing={2}>
+                  {/* Phone (Mandatory in Login & Register) */}
                   <Grid size={{ xs: 12, sm: 6 }}>
                     <TextField
                       required
                       fullWidth
                       label="Số điện thoại"
                       name="phone"
+                      type="tel"
                       value={formData.phone}
                       onChange={handleChange}
                       onBlur={() => handleBlur('phone')}
                       error={Boolean(touched.phone && errors.phone)}
                       helperText={touched.phone && errors.phone}
-                      placeholder="0912 345 678"
+                      placeholder="Ví dụ: 0912345678 (10-11 số)"
                       slotProps={{
                         input: {
                           startAdornment: (
@@ -296,69 +338,101 @@ const Register = () => {
                       }}
                     />
                   </Grid>
+
+                  {/* Email (Optional in DB, validated if provided) */}
+                  <Grid size={{ xs: 12, sm: 6 }}>
+                    <TextField
+                      fullWidth
+                      label="Địa chỉ Email"
+                      name="email"
+                      type="email"
+                      value={formData.email}
+                      onChange={handleChange}
+                      onBlur={() => handleBlur('email')}
+                      error={Boolean(touched.email && errors.email)}
+                      helperText={touched.email && errors.email}
+                      placeholder="name@example.com (Không bắt buộc)"
+                      slotProps={{
+                        input: {
+                          startAdornment: (
+                            <InputAdornment position="start">
+                              <EmailIcon sx={{ color: 'text.secondary', fontSize: 20 }} />
+                            </InputAdornment>
+                          ),
+                        },
+                      }}
+                    />
+                  </Grid>
                 </Grid>
 
-                {/* Password */}
-                <TextField
-                  required
-                  fullWidth
-                  label="Mật khẩu"
-                  name="password"
-                  type={showPassword ? 'text' : 'password'}
-                  value={formData.password}
-                  onChange={handleChange}
-                  onBlur={() => handleBlur('password')}
-                  error={Boolean(touched.password && errors.password)}
-                  helperText={touched.password && errors.password}
-                  placeholder="Tối thiểu 6 ký tự"
-                  slotProps={{
-                    input: {
-                      startAdornment: (
-                        <InputAdornment position="start">
-                          <LockIcon sx={{ color: 'text.secondary', fontSize: 20 }} />
-                        </InputAdornment>
-                      ),
-                      endAdornment: (
-                        <InputAdornment position="end">
-                          <IconButton onClick={() => setShowPassword(!showPassword)} edge="end">
-                            {showPassword ? <VisibilityOff fontSize="small" /> : <Visibility fontSize="small" />}
-                          </IconButton>
-                        </InputAdornment>
-                      ),
-                    },
-                  }}
-                />
+                {/* Row 3: Password & Confirm Password */}
+                <Grid container spacing={2}>
+                  {/* Password */}
+                  <Grid size={{ xs: 12, sm: 6 }}>
+                    <TextField
+                      required
+                      fullWidth
+                      label="Mật khẩu"
+                      name="password"
+                      type={showPassword ? 'text' : 'password'}
+                      value={formData.password}
+                      onChange={handleChange}
+                      onBlur={() => handleBlur('password')}
+                      error={Boolean(touched.password && errors.password)}
+                      helperText={touched.password && errors.password}
+                      placeholder="Tối thiểu 6 ký tự"
+                      slotProps={{
+                        input: {
+                          startAdornment: (
+                            <InputAdornment position="start">
+                              <LockIcon sx={{ color: 'text.secondary', fontSize: 20 }} />
+                            </InputAdornment>
+                          ),
+                          endAdornment: (
+                            <InputAdornment position="end">
+                              <IconButton onClick={() => setShowPassword(!showPassword)} edge="end">
+                                {showPassword ? <VisibilityOff fontSize="small" /> : <Visibility fontSize="small" />}
+                              </IconButton>
+                            </InputAdornment>
+                          ),
+                        },
+                      }}
+                    />
+                  </Grid>
 
-                {/* Confirm Password */}
-                <TextField
-                  required
-                  fullWidth
-                  label="Xác nhận mật khẩu"
-                  name="confirmPassword"
-                  type={showConfirmPassword ? 'text' : 'password'}
-                  value={formData.confirmPassword}
-                  onChange={handleChange}
-                  onBlur={() => handleBlur('confirmPassword')}
-                  error={Boolean(touched.confirmPassword && errors.confirmPassword)}
-                  helperText={touched.confirmPassword && errors.confirmPassword}
-                  placeholder="Nhập lại mật khẩu vừa đặt"
-                  slotProps={{
-                    input: {
-                      startAdornment: (
-                        <InputAdornment position="start">
-                          <LockIcon sx={{ color: 'text.secondary', fontSize: 20 }} />
-                        </InputAdornment>
-                      ),
-                      endAdornment: (
-                        <InputAdornment position="end">
-                          <IconButton onClick={() => setShowConfirmPassword(!showConfirmPassword)} edge="end">
-                            {showConfirmPassword ? <VisibilityOff fontSize="small" /> : <Visibility fontSize="small" />}
-                          </IconButton>
-                        </InputAdornment>
-                      ),
-                    },
-                  }}
-                />
+                  {/* Confirm Password */}
+                  <Grid size={{ xs: 12, sm: 6 }}>
+                    <TextField
+                      required
+                      fullWidth
+                      label="Xác nhận mật khẩu"
+                      name="confirmPassword"
+                      type={showConfirmPassword ? 'text' : 'password'}
+                      value={formData.confirmPassword}
+                      onChange={handleChange}
+                      onBlur={() => handleBlur('confirmPassword')}
+                      error={Boolean(touched.confirmPassword && errors.confirmPassword)}
+                      helperText={touched.confirmPassword && errors.confirmPassword}
+                      placeholder="Nhập lại mật khẩu vừa đặt"
+                      slotProps={{
+                        input: {
+                          startAdornment: (
+                            <InputAdornment position="start">
+                              <LockIcon sx={{ color: 'text.secondary', fontSize: 20 }} />
+                            </InputAdornment>
+                          ),
+                          endAdornment: (
+                            <InputAdornment position="end">
+                              <IconButton onClick={() => setShowConfirmPassword(!showConfirmPassword)} edge="end">
+                                {showConfirmPassword ? <VisibilityOff fontSize="small" /> : <Visibility fontSize="small" />}
+                              </IconButton>
+                            </InputAdornment>
+                          ),
+                        },
+                      }}
+                    />
+                  </Grid>
+                </Grid>
 
                 {/* Terms agreement checkbox */}
                 <Box>
@@ -401,7 +475,14 @@ const Register = () => {
                     boxShadow: '0 6px 18px rgba(255, 107, 53, 0.4)',
                   }}
                 >
-                  {isSubmitting ? <CircularProgress size={24} color="inherit" /> : 'Hoàn Tất Đăng Ký'}
+                  {isSubmitting ? (
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                      <CircularProgress size={24} color="inherit" />
+                      <span>Đang tạo tài khoản...</span>
+                    </Box>
+                  ) : (
+                    'Hoàn Tất Đăng Ký'
+                  )}
                 </Button>
               </Stack>
             </Box>

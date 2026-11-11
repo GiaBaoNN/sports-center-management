@@ -14,6 +14,8 @@ import {
   ListItemText,
   Divider,
   Stack,
+  Chip,
+  Avatar,
   useTheme,
   useMediaQuery,
 } from '@mui/material';
@@ -24,8 +26,11 @@ import {
   PhoneInTalk as PhoneIcon,
   Login as LoginIcon,
   PersonAdd as PersonAddIcon,
+  Logout as LogoutIcon,
+  Dashboard as DashboardIcon,
 } from '@mui/icons-material';
-import { Link as RouterLink, useLocation } from 'react-router-dom';
+import { Link as RouterLink, useLocation, useNavigate } from 'react-router-dom';
+import { useAuth } from '../../context/AuthContext';
 
 const navItems = [
   { label: 'Trang Chủ', path: '/' },
@@ -38,8 +43,10 @@ const Navbar = () => {
   const [mobileOpen, setMobileOpen] = useState(false);
   const [scrolled, setScrolled] = useState(false);
   const location = useLocation();
+  const navigate = useNavigate();
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down('md'));
+  const { user, isAuthenticated, logout } = useAuth();
 
   useEffect(() => {
     const handleScroll = () => {
@@ -57,9 +64,34 @@ const Navbar = () => {
     setMobileOpen((prev) => !prev);
   };
 
+  const handleLogout = () => {
+    logout();
+    navigate('/');
+  };
+
   const isActive = (path) => {
     if (path === '/') return location.pathname === '/';
     return location.pathname.startsWith(path);
+  };
+
+  const getRoleDashboardPath = (role) => {
+    switch (role) {
+      case 'Manager': return '/admin';
+      case 'Receptionist': return '/reception';
+      case 'Coach': return '/coach';
+      case 'Member':
+      default: return '/member';
+    }
+  };
+
+  const getRoleDashboardLabel = (role) => {
+    switch (role) {
+      case 'Manager': return 'Trang Quản Trị';
+      case 'Receptionist': return 'Bàn Lễ Tân';
+      case 'Coach': return 'HLV Portal';
+      case 'Member':
+      default: return 'Cổng Hội Viên';
+    }
   };
 
   return (
@@ -210,40 +242,104 @@ const Navbar = () => {
                   </Typography>
                 </Box>
 
-                <Button
-                  component={RouterLink}
-                  to="/login"
-                  variant="outlined"
-                  color="primary"
-                  startIcon={<LoginIcon sx={{ fontSize: 18 }} />}
-                  sx={{
-                    fontWeight: 600,
-                    borderColor: 'rgba(25, 118, 210, 0.3)',
-                    '&:hover': {
-                      borderColor: 'primary.main',
-                      bgcolor: 'rgba(25, 118, 210, 0.04)',
-                    },
-                  }}
-                >
-                  Đăng Nhập
-                </Button>
+                {isAuthenticated ? (
+                  <Stack direction="row" spacing={1.2} alignItems="center">
+                    <Button
+                      component={RouterLink}
+                      to={getRoleDashboardPath(user?.role)}
+                      variant="contained"
+                      color="primary"
+                      size="small"
+                      startIcon={<DashboardIcon sx={{ fontSize: 18 }} />}
+                      sx={{
+                        fontWeight: 700,
+                        borderRadius: 2,
+                        textTransform: 'none',
+                        px: 1.8,
+                        py: 0.8,
+                        boxShadow: '0 4px 12px rgba(25, 118, 210, 0.25)',
+                      }}
+                    >
+                      {getRoleDashboardLabel(user?.role)}
+                    </Button>
+                    <Chip
+                      avatar={
+                        <Avatar sx={{ bgcolor: 'secondary.main', color: '#fff', fontWeight: 800 }}>
+                          {user?.fullName?.charAt(0) || 'U'}
+                        </Avatar>
+                      }
+                      label={
+                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.8 }}>
+                          <Typography variant="body2" sx={{ fontWeight: 700 }}>
+                            {user?.fullName || user?.username}
+                          </Typography>
+                          <Typography
+                            variant="caption"
+                            sx={{
+                              bgcolor: 'rgba(25, 118, 210, 0.12)',
+                              color: 'primary.main',
+                              px: 0.8,
+                              py: 0.2,
+                              borderRadius: 1,
+                              fontWeight: 800,
+                            }}
+                          >
+                            {user?.role}
+                          </Typography>
+                        </Box>
+                      }
+                      variant="outlined"
+                      sx={{ py: 2, px: 0.5, borderColor: '#CBD5E1' }}
+                    />
+                    <Button
+                      variant="outlined"
+                      color="inherit"
+                      size="small"
+                      startIcon={<LogoutIcon sx={{ fontSize: 16 }} />}
+                      onClick={handleLogout}
+                      sx={{ fontWeight: 600, borderColor: '#CBD5E1', color: 'text.secondary' }}
+                    >
+                      Đăng Xuất
+                    </Button>
+                  </Stack>
+                ) : (
+                  <>
+                    <Button
+                      component={RouterLink}
+                      to="/login"
+                      variant="outlined"
+                      color="primary"
+                      startIcon={<LoginIcon sx={{ fontSize: 18 }} />}
+                      sx={{
+                        fontWeight: 600,
+                        borderColor: 'rgba(25, 118, 210, 0.3)',
+                        '&:hover': {
+                          borderColor: 'primary.main',
+                          bgcolor: 'rgba(25, 118, 210, 0.04)',
+                        },
+                      }}
+                    >
+                      Đăng Nhập
+                    </Button>
 
-                <Button
-                  component={RouterLink}
-                  to="/register"
-                  variant="contained"
-                  color="secondary"
-                  startIcon={<PersonAddIcon sx={{ fontSize: 18 }} />}
-                  sx={{
-                    fontWeight: 700,
-                    boxShadow: '0 4px 14px rgba(255, 107, 53, 0.35)',
-                    '&:hover': {
-                      boxShadow: '0 6px 20px rgba(255, 107, 53, 0.45)',
-                    },
-                  }}
-                >
-                  Đăng Ký Ngay
-                </Button>
+                    <Button
+                      component={RouterLink}
+                      to="/register"
+                      variant="contained"
+                      color="secondary"
+                      startIcon={<PersonAddIcon sx={{ fontSize: 18 }} />}
+                      sx={{
+                        fontWeight: 700,
+                        boxShadow: '0 4px 14px rgba(255, 107, 53, 0.35)',
+                        '&:hover': {
+                          boxShadow: '0 6px 20px rgba(255, 107, 53, 0.45)',
+                        },
+                      }}
+                    >
+                      Đăng Ký Ngay
+                    </Button>
+                  </>
+                )}
               </Stack>
             )}
 
@@ -310,6 +406,31 @@ const Navbar = () => {
 
         <Divider sx={{ mb: 2 }} />
 
+        {isAuthenticated && (
+          <Box sx={{ p: 2, bgcolor: '#F8FAFC', borderRadius: 3, mb: 2 }}>
+            <Typography variant="caption" color="text.secondary">
+              Đang đăng nhập với vai trò:
+            </Typography>
+            <Typography variant="subtitle1" sx={{ fontWeight: 800 }}>
+              {user?.fullName || user?.username} ({user?.role})
+            </Typography>
+            <Typography variant="body2" color="text.secondary" sx={{ mb: 1.5 }}>
+              SĐT: {user?.phone}
+            </Typography>
+            <Button
+              component={RouterLink}
+              to={getRoleDashboardPath(user?.role)}
+              onClick={handleDrawerToggle}
+              variant="contained"
+              fullWidth
+              startIcon={<DashboardIcon />}
+              sx={{ fontWeight: 700, borderRadius: 2 }}
+            >
+              Vào {getRoleDashboardLabel(user?.role)}
+            </Button>
+          </Box>
+        )}
+
         <List sx={{ mb: 3 }}>
           {navItems.map((item) => {
             const active = isActive(item.path);
@@ -321,8 +442,8 @@ const Navbar = () => {
                   onClick={handleDrawerToggle}
                   sx={{
                     borderRadius: 2,
-                    backgroundColor: active ? 'rgba(25, 118, 210, 0.08)' : 'transparent',
-                    color: active ? 'primary.main' : 'text.primary',
+                    backgroundColor: active ? 'rgba(255, 107, 53, 0.08)' : 'transparent',
+                    color: active ? 'secondary.main' : 'text.primary',
                     fontWeight: active ? 700 : 500,
                   }}
                 >
@@ -330,7 +451,7 @@ const Navbar = () => {
                     primary={item.label}
                     primaryTypographyProps={{
                       fontWeight: active ? 700 : 600,
-                      color: active ? 'primary.main' : 'text.primary',
+                      color: active ? 'secondary.main' : 'text.primary',
                     }}
                   />
                 </ListItemButton>
@@ -355,29 +476,47 @@ const Navbar = () => {
         </Box>
 
         <Stack spacing={1.5} sx={{ mt: 'auto' }}>
-          <Button
-            component={RouterLink}
-            to="/login"
-            variant="outlined"
-            fullWidth
-            onClick={handleDrawerToggle}
-            startIcon={<LoginIcon />}
-            sx={{ py: 1.2 }}
-          >
-            Đăng Nhập
-          </Button>
-          <Button
-            component={RouterLink}
-            to="/register"
-            variant="contained"
-            color="secondary"
-            fullWidth
-            onClick={handleDrawerToggle}
-            startIcon={<PersonAddIcon />}
-            sx={{ py: 1.2 }}
-          >
-            Đăng Ký Hội Viên Mới
-          </Button>
+          {isAuthenticated ? (
+            <Button
+              variant="outlined"
+              color="error"
+              fullWidth
+              onClick={() => {
+                handleLogout();
+                handleDrawerToggle();
+              }}
+              startIcon={<LogoutIcon />}
+              sx={{ py: 1.2 }}
+            >
+              Đăng Xuất ({user?.username})
+            </Button>
+          ) : (
+            <>
+              <Button
+                component={RouterLink}
+                to="/login"
+                variant="outlined"
+                fullWidth
+                onClick={handleDrawerToggle}
+                startIcon={<LoginIcon />}
+                sx={{ py: 1.2 }}
+              >
+                Đăng Nhập
+              </Button>
+              <Button
+                component={RouterLink}
+                to="/register"
+                variant="contained"
+                color="secondary"
+                fullWidth
+                onClick={handleDrawerToggle}
+                startIcon={<PersonAddIcon />}
+                sx={{ py: 1.2 }}
+              >
+                Đăng Ký Hội Viên Mới
+              </Button>
+            </>
+          )}
         </Stack>
       </Drawer>
     </>
