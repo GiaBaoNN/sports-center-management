@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import {
   Box,
+  Grid,
   Paper,
   Typography,
   Table,
@@ -214,7 +215,7 @@ const AdminUsers = () => {
       {/* Filter and Search Bar */}
       <Paper elevation={0} sx={{ p: 2.5, borderRadius: 3, border: '1px solid #E2E8F0', mb: 3 }}>
         <Grid container spacing={2} alignItems="center">
-          <Grid item xs={12} sm={6}>
+          <Grid size={{ xs: 12, sm: 6 }}>
             <TextField
               fullWidth
               size="small"
@@ -226,7 +227,7 @@ const AdminUsers = () => {
               }}
             />
           </Grid>
-          <Grid item xs={12} sm={6}>
+          <Grid size={{ xs: 12, sm: 6 }}>
             <Stack direction="row" spacing={1} flexWrap="wrap">
               {['ALL', 'Manager', 'Coach', 'Receptionist', 'Member'].map((role) => (
                 <Chip
