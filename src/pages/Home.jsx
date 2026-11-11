@@ -15,14 +15,10 @@ import {
   Avatar,
   IconButton,
   Paper,
-  Tabs,
-  Tab,
 } from '@mui/material';
 import {
   FitnessCenter as FitnessCenterIcon,
   Pool as PoolIcon,
-  SelfImprovement as YogaIcon,
-  SportsMma as BoxingIcon,
   ArrowForward as ArrowForwardIcon,
   CheckCircle as CheckCircleIcon,
   Cancel as CancelIcon,
@@ -313,10 +309,10 @@ const Home = () => {
                   </Box>
                   <Box>
                     <Typography variant="subtitle2" sx={{ fontWeight: 800, lineHeight: 1.2 }}>
-                      Tập Thử 03 Ngày
+                      Gói Tập Đa Dạng
                     </Typography>
                     <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 600 }}>
-                      Miễn phí 100% trải nghiệm
+                      Gym, Yoga, Boxing & Bơi lội
                     </Typography>
                   </Box>
                 </Paper>
@@ -648,11 +644,11 @@ const Home = () => {
           </Box>
 
           {/* Packages Cards Grid */}
-          <Grid container spacing={3.5} alignItems="stretch">
+          <Grid container spacing={3.5} alignItems="stretch" justifyContent="center">
             {membershipPackages.map((pkg) => {
               const displayPrice = billingCycle === 'yearly' ? Math.round(pkg.priceYearly / 12) : pkg.priceMonthly;
               return (
-                <Grid size={{ xs: 12, sm: 6, lg: 3 }} key={pkg.id}>
+                <Grid size={{ xs: 12, sm: 6, lg: 4 }} key={pkg.id}>
                   <Card
                     sx={{
                       height: '100%',
@@ -973,7 +969,7 @@ const Home = () => {
             Bắt Đầu Hành Trình Lột Xác Cùng AURA SPORT Ngay Hôm Nay
           </Typography>
           <Typography variant="body1" sx={{ color: '#E0F2FE', fontSize: '1.15rem', mb: 4, lineHeight: 1.6 }}>
-            Đăng ký tài khoản ngay để nhận vé mời trải nghiệm 03 ngày tập luyện không giới hạn và nhận tư vấn chỉ số InBody miễn phí cùng chuyên gia.
+            Đăng ký tài khoản hội viên ngay hôm nay để nhận quyền truy cập hệ thống phòng tập chuẩn quốc tế và tham gia các lớp học cùng HLV chuyên nghiệp.
           </Typography>
           <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2} justifyContent="center">
             <Button
@@ -990,7 +986,7 @@ const Home = () => {
                 '&:hover': { bgcolor: '#F1F5F9', color: '#E0531E' },
               }}
             >
-              Đăng Ký Nhận Thẻ Tập Thử
+              Đăng Ký Tài Khoản Ngay
             </Button>
             <Button
               component={RouterLink}

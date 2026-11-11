@@ -14,100 +14,101 @@ import {
   Chip,
   Stack,
   Avatar,
-  LinearProgress,
   InputAdornment,
   Paper,
-  Alert,
   CircularProgress,
 } from '@mui/material';
 import {
   Search as SearchIcon,
-  FilterAlt as FilterIcon,
   RestartAlt as ResetIcon,
-  AccessTime as AccessTimeIcon,
   Room as RoomIcon,
-  Whatshot as FireIcon,
   FitnessCenter as FitnessCenterIcon,
   EventAvailable as BookIcon,
-  CheckCircle as CheckCircleIcon,
-  CardMembership as MembershipIcon,
-  BookmarkAdded as BookmarkAddedIcon,
+  CloudDone as CloudDoneIcon,
+  CloudOff as CloudOffIcon,
 } from '@mui/icons-material';
 import SectionHeader from '../components/common/SectionHeader';
 import ClassDetailModal from '../components/common/ClassDetailModal';
-import { trainers } from '../data/sportsData';
-import { classBookingService, mockCurrentUser } from '../services/classBookingService';
+import { classApi } from '../services/api';
+import { centerClasses } from '../data/sportsData';
 
-const sportsOptions = [
-  { value: 'all', label: 'Tất cả môn thể thao' },
-  { value: 'Gym', label: 'Gym & Thể hình' },
-  { value: 'Bơi lội', label: 'Bơi lội 4 mùa' },
-  { value: 'Yoga', label: 'Yoga & Thiền' },
-  { value: 'Boxing', label: 'Boxing & Kickfit' },
-  { value: 'Pilates', label: 'Pilates Reformer' },
-  { value: 'GroupX', label: 'Zumba & GroupX' },
-];
+const sportImages = {
+  Yoga: 'https://images.unsplash.com/photo-1506126613408-eca07ce68773?q=80&w=800&auto=format&fit=crop',
+  Badminton: 'https://images.unsplash.com/photo-1626224583764-f87db24ac4ea?q=80&w=800&auto=format&fit=crop',
+  Swimming: 'https://images.unsplash.com/photo-1519315901367-f34ff9154487?q=80&w=800&auto=format&fit=crop',
+  Fitness: 'https://images.unsplash.com/photo-1517838277536-f5f99be501cd?q=80&w=800&auto=format&fit=crop',
+  Gym: 'https://images.unsplash.com/photo-1534438327276-14e5300c3a48?q=80&w=800&auto=format&fit=crop',
+  Boxing: 'https://images.unsplash.com/photo-1549719386-74dfcbf7dbed?q=80&w=800&auto=format&fit=crop',
+  Pilates: 'https://images.unsplash.com/photo-1518611012118-696072aa579a?q=80&w=800&auto=format&fit=crop',
+  GroupX: 'https://images.unsplash.com/photo-1524594152303-9fd13543fe6e?q=80&w=800&auto=format&fit=crop',
+};
 
-const timeSlotOptions = [
-  { value: 'all', label: 'Tất cả khung giờ' },
-  { value: 'morning', label: 'Buổi Sáng (06:00 - 11:00)' },
-  { value: 'afternoon', label: 'Buổi Chiều (14:00 - 17:00)' },
-  { value: 'evening', label: 'Buổi Tối (17:30 - 21:00)' },
-];
-
-const dayOptions = [
-  { value: 'all', label: 'Tất cả các ngày' },
-  { value: 'Thứ 2', label: 'Thứ 2' },
-  { value: 'Thứ 3', label: 'Thứ 3' },
-  { value: 'Thứ 4', label: 'Thứ 4' },
-  { value: 'Thứ 5', label: 'Thứ 5' },
-  { value: 'Thứ 6', label: 'Thứ 6' },
-  { value: 'Thứ 7', label: 'Thứ 7' },
-  { value: 'Chủ nhật', label: 'Chủ nhật' },
-];
+const statusMap = {
+  Upcoming: 'Sắp diễn ra',
+  Ongoing: 'Đang mở đăng ký',
+  Completed: 'Đã hoàn thành',
+  Cancelled: 'Đã hủy',
+};
 
 const Classes = () => {
-  // Service Data States
   const [classesList, setClassesList] = useState([]);
-  const [userBookings, setUserBookings] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [isBackendConnected, setIsBackendConnected] = useState(false);
 
-  // Filter States
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedSport, setSelectedSport] = useState('all');
   const [selectedTrainer, setSelectedTrainer] = useState('all');
-  const [selectedTimeSlot, setSelectedTimeSlot] = useState('all');
-  const [selectedDay, setSelectedDay] = useState('all');
-  const [showOnlyMyBookings, setShowOnlyMyBookings] = useState(false);
+  const [selectedStatus, setSelectedStatus] = useState('all');
 
-  // Modal State
   const [selectedClass, setSelectedClass] = useState(null);
   const [detailModalOpen, setDetailModalOpen] = useState(false);
-  const [feedbackAlert, setFeedbackAlert] = useState(null);
 
-  // Tải dữ liệu lớp và danh sách đăng ký từ service
-  useEffect(() => {
-    const fetchData = async () => {
-      try {
-        setLoading(true);
-        const [cls, bookings] = await Promise.all([
-          classBookingService.getClasses(),
-          classBookingService.getUserBookings(mockCurrentUser.id),
-        ]);
-        setClassesList(cls);
-        setUserBookings(bookings);
-      } catch (err) {
-        console.error('Lỗi khi tải dữ liệu lớp học:', err);
-      } finally {
-        setLoading(false);
+  // Fetch real classes from backend API: GET /api/classes
+  const fetchClasses = async () => {
+    setLoading(true);
+    try {
+      const data = await classApi.getAll();
+      if (Array.isArray(data) && data.length > 0) {
+        // Map backend ClassEntity: { classId, className, sport, room, coach, status }
+        const mapped = data.map((c) => ({
+          id: c.classId,
+          title: c.className,
+          sport: c.sport?.name || 'Khác',
+          sportId: c.sport?.sportId,
+          sportDesc: c.sport?.description,
+          trainer: c.coach?.fullName || 'HLV Trung Tâm',
+          trainerPhone: c.coach?.phone,
+          trainerEmail: c.coach?.email,
+          room: c.room ? `${c.room.roomName} (${c.room.location || 'Tầng 1'})` : 'Phòng tập',
+          capacity: c.room?.maxCapacity || 20,
+          booked: 0,
+          status: statusMap[c.status] || c.status,
+          rawStatus: c.status,
+          level: 'Tiêu chuẩn',
+          image:
+            sportImages[c.sport?.name] ||
+            'https://images.unsplash.com/photo-1517838277536-f5f99be501cd?q=80&w=800&auto=format&fit=crop',
+          raw: c,
+        }));
+        setClassesList(mapped);
+        setIsBackendConnected(true);
+      } else {
+        // Fallback to sample data if database is empty
+        setClassesList(centerClasses);
+        setIsBackendConnected(false);
       }
-    };
-    fetchData();
-  }, []);
+    } catch (err) {
+      console.warn('Backend API /api/classes not reachable, falling back to local data:', err);
+      setClassesList(centerClasses);
+      setIsBackendConnected(false);
+    } finally {
+      setLoading(false);
+    }
+  };
 
-  const bookedClassIds = useMemo(() => {
-    return new Set(userBookings.map((b) => b.classId));
-  }, [userBookings]);
+  useEffect(() => {
+    fetchClasses();
+  }, []);
 
   const handleOpenDetail = (classItem) => {
     setSelectedClass(classItem);
@@ -118,171 +119,69 @@ const Classes = () => {
     setSearchQuery('');
     setSelectedSport('all');
     setSelectedTrainer('all');
-    setSelectedTimeSlot('all');
-    setSelectedDay('all');
-    setShowOnlyMyBookings(false);
+    setSelectedStatus('all');
   };
 
-  // Callback sau khi đăng ký lớp chính thức thành công (FE-10)
-  const handleBookingSuccess = (updatedClass, newRegistration) => {
-    setClassesList((prev) =>
-      prev.map((c) => (c.id === updatedClass.id ? updatedClass : c))
-    );
-    setUserBookings((prev) => [newRegistration, ...prev]);
-    setSelectedClass(updatedClass);
-    setFeedbackAlert({
-      type: 'success',
-      message: `Đăng ký lớp "${updatedClass.title}" thành công! Slot của bạn đã được ghi nhận.`,
+  // Derive unique sports and trainers for filter options
+  const sportsOptions = useMemo(() => {
+    const set = new Set();
+    classesList.forEach((c) => {
+      if (c.sport) set.add(c.sport);
     });
-  };
+    return Array.from(set);
+  }, [classesList]);
 
-  // Callback sau khi hủy đăng ký lớp thành công (FE-11)
-  const handleCancelSuccess = (updatedClass, classId) => {
-    setClassesList((prev) =>
-      prev.map((c) => (c.id === updatedClass.id ? updatedClass : c))
-    );
-    setUserBookings((prev) => prev.filter((b) => b.classId !== classId));
-    setSelectedClass(updatedClass);
-    setFeedbackAlert({
-      type: 'info',
-      message: `Đã hủy đặt chỗ lớp "${updatedClass.title}". Slot chỗ đã được hoàn lại thành công.`,
+  const trainersOptions = useMemo(() => {
+    const set = new Set();
+    classesList.forEach((c) => {
+      if (c.trainer) set.add(c.trainer);
     });
-  };
+    return Array.from(set);
+  }, [classesList]);
 
-  // Lọc danh sách lớp học
+  // Filtered Classes computation
   const filteredClasses = useMemo(() => {
     return classesList.filter((c) => {
-      // Filter My Bookings only
-      if (showOnlyMyBookings && !bookedClassIds.has(c.id)) {
-        return false;
-      }
-      // Search text
       if (searchQuery && !c.title.toLowerCase().includes(searchQuery.toLowerCase())) {
         return false;
       }
-      // Sport
       if (selectedSport !== 'all' && c.sport !== selectedSport) {
         return false;
       }
-      // Trainer
       if (selectedTrainer !== 'all' && c.trainer !== selectedTrainer) {
         return false;
       }
-      // Time Slot
-      if (selectedTimeSlot !== 'all' && c.timeSlot !== selectedTimeSlot) {
-        return false;
-      }
-      // Day
-      if (selectedDay !== 'all' && !c.days.includes(selectedDay)) {
+      if (selectedStatus !== 'all' && c.rawStatus !== selectedStatus && c.status !== selectedStatus) {
         return false;
       }
       return true;
     });
-  }, [
-    classesList,
-    searchQuery,
-    selectedSport,
-    selectedTrainer,
-    selectedTimeSlot,
-    selectedDay,
-    showOnlyMyBookings,
-    bookedClassIds,
-  ]);
+  }, [classesList, searchQuery, selectedSport, selectedTrainer, selectedStatus]);
 
   return (
     <Box sx={{ py: { xs: 8, md: 10 }, bgcolor: 'background.default' }}>
       <Container maxWidth="xl">
         <SectionHeader
-          badge="LỊCH HỌC TỔNG HỢP & ĐẶT CHỖ"
+          badge="LỊCH HỌC TỔNG HỢP (BACKEND API: /api/classes)"
           title="Thời Khóa Biểu & Danh Mục Lớp Học Tại"
           highlightTitle="AURA SPORT"
-          subtitle="Hơn 120 lớp học mỗi tuần được hướng dẫn bởi các HLV đạt chuẩn quốc tế. Hội viên chính thức có thể đặt chỗ hoặc hủy đăng ký trực tiếp."
+          subtitle="Dữ liệu lớp học được đồng bộ thời gian thực từ cơ sở dữ liệu backend và hệ thống quản lý trung tâm SCMS."
         />
 
-        {/* Global Feedback Alert */}
-        {feedbackAlert && (
-          <Alert
-            severity={feedbackAlert.type}
-            onClose={() => setFeedbackAlert(null)}
-            sx={{ mb: 4, borderRadius: 3 }}
-          >
-            {feedbackAlert.message}
-          </Alert>
-        )}
-
-        {/* Member Status & Booking Quick Bar */}
-        <Paper
-          elevation={0}
-          sx={{
-            p: 2,
-            mb: 3,
-            bgcolor: '#FFFFFF',
-            borderRadius: 3.5,
-            border: '1px solid #E2E8F0',
-            display: 'flex',
-            flexDirection: { xs: 'column', sm: 'row' },
-            alignItems: { xs: 'flex-start', sm: 'center' },
-            justifyContent: 'space-between',
-            gap: 2,
-          }}
-        >
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
-            <Box
-              sx={{
-                width: 42,
-                height: 42,
-                borderRadius: 2.5,
-                bgcolor: 'rgba(25, 118, 210, 0.1)',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                color: 'primary.main',
-              }}
-            >
-              <MembershipIcon />
-            </Box>
-            <Box>
-              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                <Typography variant="subtitle2" sx={{ fontWeight: 800 }}>
-                  Hội viên: {mockCurrentUser.fullName}
-                </Typography>
-                <Chip
-                  size="small"
-                  label={mockCurrentUser.membership.status}
-                  color="success"
-                  sx={{ height: 20, fontSize: '0.65rem', fontWeight: 800 }}
-                />
-              </Box>
-              <Typography variant="caption" color="text.secondary">
-                {mockCurrentUser.membership.packageName} • Đã đăng ký:{' '}
-                <strong style={{ color: '#1976D2' }}>{userBookings.length} lớp học</strong>
-              </Typography>
-            </Box>
-          </Box>
-
-          {/* Switch View Tabs */}
-          <Stack direction="row" spacing={1}>
-            <Button
-              size="small"
-              variant={!showOnlyMyBookings ? 'contained' : 'outlined'}
-              color="primary"
-              onClick={() => setShowOnlyMyBookings(false)}
-              sx={{ fontWeight: 700 }}
-            >
-              Tất Cả Lớp Học ({classesList.length})
-            </Button>
-            <Button
-              size="small"
-              variant={showOnlyMyBookings ? 'contained' : 'outlined'}
-              color="success"
-              startIcon={<BookmarkAddedIcon />}
-              onClick={() => setShowOnlyMyBookings(true)}
-              sx={{ fontWeight: 700 }}
-            >
-              Lớp Tôi Đã Đặt ({userBookings.length})
-            </Button>
-          </Stack>
-        </Paper>
+        {/* Backend Connectivity Status Banner */}
+        <Box sx={{ mb: 4, display: 'flex', justifyContent: 'flex-end' }}>
+          <Chip
+            icon={isBackendConnected ? <CloudDoneIcon /> : <CloudOffIcon />}
+            label={
+              isBackendConnected
+                ? 'Đã kết nối Backend API (/api/classes)'
+                : 'Chế độ ngoại tuyến (Hiển thị dữ liệu mẫu dự phòng)'
+            }
+            color={isBackendConnected ? 'success' : 'default'}
+            variant="outlined"
+            sx={{ fontWeight: 600, py: 0.5 }}
+          />
+        </Box>
 
         {/* 1. FILTER CONTROLS BAR */}
         <Paper
@@ -293,7 +192,7 @@ const Classes = () => {
             bgcolor: '#FFFFFF',
             border: '1px solid #E2E8F0',
             boxShadow: '0 8px 24px rgba(0, 0, 0, 0.04)',
-            mb: 5,
+            mb: 6,
           }}
         >
           <Grid container spacing={2} alignItems="center">
@@ -302,7 +201,7 @@ const Classes = () => {
               <TextField
                 fullWidth
                 size="small"
-                placeholder="Tìm theo tên lớp học (vd: Yoga, HIIT, Bơi...)"
+                placeholder="Tìm theo tên lớp học (vd: Yoga, Badminton, Swimming...)"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 slotProps={{
@@ -318,75 +217,58 @@ const Classes = () => {
             </Grid>
 
             {/* Sport Filter */}
-            <Grid size={{ xs: 6, sm: 3, md: 2 }}>
+            <Grid size={{ xs: 6, sm: 3, md: 3 }}>
               <TextField
                 select
                 fullWidth
                 size="small"
-                label="Môn Thể Thao"
+                label="Môn Thể Thao (Sport)"
                 value={selectedSport}
                 onChange={(e) => setSelectedSport(e.target.value)}
               >
-                {sportsOptions.map((opt) => (
-                  <MenuItem key={opt.value} value={opt.value}>
-                    {opt.label}
+                <MenuItem value="all">Tất cả môn thể thao</MenuItem>
+                {sportsOptions.map((sport) => (
+                  <MenuItem key={sport} value={sport}>
+                    {sport}
                   </MenuItem>
                 ))}
               </TextField>
             </Grid>
 
-            {/* Trainer Filter */}
-            <Grid size={{ xs: 6, sm: 3, md: 2 }}>
+            {/* Trainer / Coach Filter */}
+            <Grid size={{ xs: 6, sm: 3, md: 3 }}>
               <TextField
                 select
                 fullWidth
                 size="small"
-                label="Huấn Luyện Viên"
+                label="Huấn Luyện Viên (Coach)"
                 value={selectedTrainer}
                 onChange={(e) => setSelectedTrainer(e.target.value)}
               >
                 <MenuItem value="all">Tất cả HLV</MenuItem>
-                {trainers.map((t) => (
-                  <MenuItem key={t.id} value={t.name}>
-                    {t.name}
+                {trainersOptions.map((trainer) => (
+                  <MenuItem key={trainer} value={trainer}>
+                    {trainer}
                   </MenuItem>
                 ))}
               </TextField>
             </Grid>
 
-            {/* Time Slot Filter */}
+            {/* Status Filter */}
             <Grid size={{ xs: 6, sm: 3, md: 2 }}>
               <TextField
                 select
                 fullWidth
                 size="small"
-                label="Khung Giờ"
-                value={selectedTimeSlot}
-                onChange={(e) => setSelectedTimeSlot(e.target.value)}
+                label="Trạng Thái (Status)"
+                value={selectedStatus}
+                onChange={(e) => setSelectedStatus(e.target.value)}
               >
-                {timeSlotOptions.map((opt) => (
-                  <MenuItem key={opt.value} value={opt.value}>
-                    {opt.label}
-                  </MenuItem>
-                ))}
-              </TextField>
-            </Grid>
-
-            {/* Day Filter */}
-            <Grid size={{ xs: 6, sm: 3, md: 2 }}>
-              <TextField
-                select
-                fullWidth
-                size="small"
-                label="Thứ trong tuần"
-                value={selectedDay}
-                onChange={(e) => setSelectedDay(e.target.value)}
-              >
-                {dayOptions.map((opt) => (
-                  <MenuItem key={opt.value} value={opt.value}>
-                    {opt.label}
-                  </MenuItem>
-                ))}
+                <MenuItem value="all">Tất cả trạng thái</MenuItem>
+                <MenuItem value="Upcoming">Sắp diễn ra</MenuItem>
+                <MenuItem value="Ongoing">Đang diễn ra</MenuItem>
+                <MenuItem value="Completed">Đã hoàn thành</MenuItem>
+                <MenuItem value="Cancelled">Đã hủy</MenuItem>
               </TextField>
             </Grid>
           </Grid>
@@ -404,7 +286,6 @@ const Classes = () => {
           >
             <Typography variant="body2" sx={{ color: 'text.secondary', fontWeight: 600 }}>
               Tìm thấy <strong style={{ color: '#1976D2' }}>{filteredClasses.length}</strong> lớp học phù hợp
-              {showOnlyMyBookings && ' (Đang xem các lớp đã đặt của bạn)'}
             </Typography>
 
             <Button
@@ -418,12 +299,12 @@ const Classes = () => {
           </Box>
         </Paper>
 
-        {/* 2. CLASSES GRID */}
+        {/* Loading Spinner */}
         {loading ? (
           <Box sx={{ textAlign: 'center', py: 10 }}>
-            <CircularProgress size={40} />
-            <Typography variant="body2" color="text.secondary" sx={{ mt: 2 }}>
-              Đang tải lịch lớp học mới nhất...
+            <CircularProgress color="primary" size={48} />
+            <Typography variant="body2" sx={{ color: 'text.secondary', mt: 2 }}>
+              Đang tải danh sách lớp học từ máy chủ backend...
             </Typography>
           </Box>
         ) : filteredClasses.length === 0 ? (
@@ -438,33 +319,22 @@ const Classes = () => {
           >
             <FitnessCenterIcon sx={{ fontSize: 64, color: '#CBD5E1', mb: 2 }} />
             <Typography variant="h6" sx={{ fontWeight: 700, mb: 1 }}>
-              {showOnlyMyBookings
-                ? 'Bạn chưa đăng ký tham gia lớp học nào'
-                : 'Không tìm thấy lớp học nào phù hợp với bộ lọc'}
+              Không tìm thấy lớp học nào phù hợp với bộ lọc đã chọn
             </Typography>
             <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
-              {showOnlyMyBookings
-                ? 'Hãy xem qua danh sách tất cả các lớp học để chọn ca tập phù hợp.'
-                : 'Vui lòng thử chọn lại môn thể thao, khung giờ hoặc xóa các tiêu chí tìm kiếm.'}
+              Vui lòng thử chọn lại môn thể thao, HLV hoặc xóa các tiêu chí tìm kiếm.
             </Typography>
-            <Button
-              variant="contained"
-              color="primary"
-              onClick={handleResetFilters}
-              sx={{ fontWeight: 700 }}
-            >
-              {showOnlyMyBookings ? 'Xem Tất Cả Lớp Học' : 'Đặt Lại Toàn Bộ Bộ Lọc'}
+            <Button variant="contained" color="primary" onClick={handleResetFilters}>
+              Đặt Lại Toàn Bộ Bộ Lọc
             </Button>
           </Box>
         ) : (
           <Grid container spacing={3.5}>
             {filteredClasses.map((item) => {
-              const availableSlots = item.capacity - item.booked;
-              const progressPercent = Math.min(
-                100,
-                Math.round((item.booked / item.capacity) * 100)
-              );
-              const isBooked = bookedClassIds.has(item.id);
+              const capacity = item.capacity || 20;
+              const isUpcoming = item.rawStatus === 'Upcoming' || item.status === 'Sắp diễn ra';
+              const isOngoing = item.rawStatus === 'Ongoing' || item.status === 'Đang mở đăng ký';
+              const isCancelled = item.rawStatus === 'Cancelled' || item.status === 'Đã hủy';
 
               return (
                 <Grid size={{ xs: 12, sm: 6, lg: 4 }} key={item.id}>
@@ -476,7 +346,6 @@ const Classes = () => {
                       borderRadius: 4,
                       overflow: 'hidden',
                       bgcolor: '#FFFFFF',
-                      border: isBooked ? '2px solid #2E7D32' : '1px solid #E2E8F0',
                       transition: 'all 0.3s ease',
                       '&:hover': {
                         transform: 'translateY(-6px)',
@@ -506,7 +375,6 @@ const Classes = () => {
                           left: 14,
                           display: 'flex',
                           gap: 1,
-                          flexWrap: 'wrap',
                         }}
                       >
                         <Chip
@@ -522,35 +390,16 @@ const Classes = () => {
                         <Chip
                           label={item.status}
                           size="small"
-                          color={
-                            item.status === 'Còn chỗ'
-                              ? 'success'
-                              : item.status === 'Sắp hết'
-                              ? 'warning'
-                              : 'error'
-                          }
+                          color={isUpcoming ? 'info' : isOngoing ? 'success' : isCancelled ? 'error' : 'default'}
                           sx={{ fontWeight: 800 }}
                         />
                       </Box>
-
-                      {/* Booked Flag Chip */}
-                      {isBooked && (
-                        <Box sx={{ position: 'absolute', top: 14, right: 14 }}>
-                          <Chip
-                            icon={<CheckCircleIcon sx={{ '&&': { color: '#FFFFFF' } }} />}
-                            label="ĐÃ ĐĂNG KÝ"
-                            size="small"
-                            color="success"
-                            sx={{ fontWeight: 800, bgcolor: '#2E7D32', boxShadow: '0 2px 8px rgba(0,0,0,0.3)' }}
-                          />
-                        </Box>
-                      )}
                     </Box>
 
                     {/* Content */}
                     <CardContent sx={{ p: 3, flexGrow: 1 }}>
                       <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 700 }}>
-                        CẤP ĐỘ: {item.level.toUpperCase()}
+                        MÃ LỚP: #{item.id}
                       </Typography>
                       <Typography
                         variant="h6"
@@ -566,7 +415,7 @@ const Classes = () => {
                         {item.title}
                       </Typography>
 
-                      {/* Trainer Avatar & Name */}
+                      {/* Coach Avatar & Name */}
                       <Box
                         sx={{
                           display: 'flex',
@@ -578,7 +427,9 @@ const Classes = () => {
                           borderRadius: 2.5,
                         }}
                       >
-                        <Avatar src={item.trainerAvatar} alt={item.trainer} sx={{ width: 36, height: 36 }} />
+                        <Avatar sx={{ width: 36, height: 36, bgcolor: 'primary.main', fontWeight: 800 }}>
+                          {item.trainer?.charAt(0) || 'C'}
+                        </Avatar>
                         <Box>
                           <Typography variant="caption" color="text.secondary" sx={{ display: 'block' }}>
                             Huấn luyện viên:
@@ -592,13 +443,6 @@ const Classes = () => {
                       {/* Details specs */}
                       <Stack spacing={1.2} sx={{ mb: 3 }}>
                         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.2 }}>
-                          <AccessTimeIcon sx={{ fontSize: 18, color: 'primary.main' }} />
-                          <Typography variant="body2" sx={{ color: 'text.primary', fontWeight: 600 }}>
-                            {item.time} ({item.daysShort})
-                          </Typography>
-                        </Box>
-
-                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.2 }}>
                           <RoomIcon sx={{ fontSize: 18, color: 'secondary.main' }} />
                           <Typography variant="body2" color="text.secondary">
                             {item.room}
@@ -606,66 +450,29 @@ const Classes = () => {
                         </Box>
 
                         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.2 }}>
-                          <FireIcon sx={{ fontSize: 18, color: '#FF6B35' }} />
+                          <FitnessCenterIcon sx={{ fontSize: 18, color: 'primary.main' }} />
                           <Typography variant="body2" color="text.secondary">
-                            Đốt {item.calories}
+                            Sức chứa: <strong>{capacity}</strong> học viên
                           </Typography>
                         </Box>
                       </Stack>
-
-                      {/* Slot Availability Progress */}
-                      <Box sx={{ pt: 1, borderTop: '1px solid #F1F5F9' }}>
-                        <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 0.8 }}>
-                          <Typography variant="caption" color="text.secondary">
-                            Tình trạng đặt chỗ:
-                          </Typography>
-                          <Typography
-                            variant="caption"
-                            sx={{
-                              fontWeight: 800,
-                              color: availableSlots <= 2 ? 'warning.main' : 'success.main',
-                            }}
-                          >
-                            Còn {availableSlots}/{item.capacity} slot
-                          </Typography>
-                        </Box>
-                        <LinearProgress
-                          variant="determinate"
-                          value={progressPercent}
-                          color={availableSlots <= 2 ? 'warning' : 'primary'}
-                          sx={{ height: 6, borderRadius: 3 }}
-                        />
-                      </Box>
                     </CardContent>
 
                     <CardActions sx={{ p: 3, pt: 0 }}>
                       <Button
                         fullWidth
-                        variant={isBooked ? 'outlined' : 'contained'}
-                        color={
-                          isBooked
-                            ? 'success'
-                            : item.status === 'Đã đủ chỗ'
-                            ? 'inherit'
-                            : 'secondary'
-                        }
-                        disabled={!isBooked && item.status === 'Đã đủ chỗ'}
-                        startIcon={isBooked ? <CheckCircleIcon /> : <BookIcon />}
+                        variant="contained"
+                        color={isCancelled ? 'inherit' : 'secondary'}
+                        disabled={isCancelled}
+                        startIcon={<BookIcon />}
                         onClick={() => handleOpenDetail(item)}
                         sx={{
                           py: 1.1,
                           fontWeight: 700,
-                          boxShadow:
-                            !isBooked && item.status !== 'Đã đủ chỗ'
-                              ? '0 4px 14px rgba(255, 107, 53, 0.35)'
-                              : 'none',
+                          boxShadow: !isCancelled ? '0 4px 14px rgba(255, 107, 53, 0.35)' : 'none',
                         }}
                       >
-                        {isBooked
-                          ? 'Đã Đăng Ký (Xem / Hủy)'
-                          : item.status === 'Đã đủ chỗ'
-                          ? 'Lớp Đã Đầy Chỗ'
-                          : 'Xem Chi Tiết & Đặt Lớp'}
+                        {isCancelled ? 'Lớp Đã Bị Hủy' : 'Xem Chi Tiết & Đăng Ký'}
                       </Button>
                     </CardActions>
                   </Card>
@@ -681,10 +488,9 @@ const Classes = () => {
         open={detailModalOpen}
         onClose={() => setDetailModalOpen(false)}
         classItem={selectedClass}
-        isBooked={Boolean(selectedClass && bookedClassIds.has(selectedClass.id))}
-        currentUser={mockCurrentUser}
-        onBookingSuccess={handleBookingSuccess}
-        onCancelSuccess={handleCancelSuccess}
+        onRegistrationSuccess={() => {
+          fetchClasses();
+        }}
       />
     </Box>
   );

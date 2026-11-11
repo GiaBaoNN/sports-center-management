@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Box,
   Container,
@@ -18,49 +18,130 @@ import {
   Accordion,
   AccordionSummary,
   AccordionDetails,
+  CircularProgress,
 } from '@mui/material';
 import {
   CheckCircle as CheckCircleIcon,
   Cancel as CancelIcon,
   ExpandMore as ExpandMoreIcon,
+  CloudDone as CloudDoneIcon,
+  CloudOff as CloudOffIcon,
 } from '@mui/icons-material';
 import SectionHeader from '../components/common/SectionHeader';
 import PackageModal from '../components/common/PackageModal';
-import { membershipPackages, packageComparisonFeatures } from '../data/sportsData';
+import { packageApi } from '../services/api';
+import { membershipPackages as fallbackPackages, packageComparisonFeatures } from '../data/sportsData';
 
 const faqs = [
   {
     q: 'Tôi có thể bảo lưu thẻ hội viên khi đi công tác hoặc bị ốm không?',
-    a: 'Hoàn toàn có thể. Tùy thuộc vào hạng thẻ, gói Gold được bảo lưu tối đa 15 ngày, gói Platinum tối đa 45 ngày và gói Diamond VIP lên đến 90 ngày. Bạn chỉ cần thông báo trước cho quầy lễ tân hoặc qua ứng dụng.',
+    a: 'Hoàn toàn có thể. Tùy thuộc vào thời hạn gói, gói từ 3 tháng trở lên được bảo lưu tối đa 30-45 ngày và gói 1 năm lên đến 90 ngày. Bạn chỉ cần thông báo trước cho quầy lễ tân hoặc qua hệ thống.',
   },
   {
     q: 'Gói tập có bao gồm người hướng dẫn (Huấn luyện viên cá nhân PT) không?',
-    a: 'Tất cả các gói từ Gold trở lên đều được tặng kèm các buổi tập 1:1 với HLV chuyên nghiệp (Gold tặng 2 buổi, Platinum 5 buổi, Diamond VIP 12 buổi). Ngoài ra, HLV sàn luôn túc trực để hỗ trợ bạn sử dụng thiết bị đúng kỹ thuật.',
+    a: 'Tất cả các gói từ Premium trở lên đều được tặng kèm các buổi tập 1:1 với HLV chuyên nghiệp. Ngoài ra, HLV sàn luôn túc trực để hỗ trợ bạn sử dụng thiết bị đúng kỹ thuật.',
   },
   {
-    q: 'Tôi có thể tập luyện tại tất cả các chi nhánh của AURA SPORT không?',
-    a: 'Hội viên sở hữu gói Platinum và Diamond VIP có đặc quyền tập luyện tại tất cả các cơ sở của AURA SPORT trên toàn quốc (Hà Nội và TP.HCM) mà không mất thêm bất kỳ chi phí nào.',
+    q: 'Hệ thống hỗ trợ những phương thức thanh toán nào?',
+    a: 'Hiện tại hệ thống SCMS hỗ trợ 2 hình thức thanh toán chính thức: Tiền mặt tại quầy (Cash) và Ví điện tử MoMo (MoMo QR Payment). Sau khi thanh toán thành công, hóa đơn điện tử sẽ được lập tự động.',
   },
   {
-    q: 'Trung tâm có chính sách thanh toán trả góp 0% lãi suất không?',
-    a: 'Có. Chúng tôi liên kết với hơn 20 ngân hàng lớn hỗ trợ trả góp kỳ hạn 3, 6, 12 tháng với lãi suất 0% cho tất cả các gói tập từ 6 tháng trở lên.',
+    q: 'Tôi có thể đăng ký nhiều gói hội viên cùng lúc không?',
+    a: 'Theo quy định của hệ thống SCMS, mỗi hội viên chỉ được sở hữu 01 gói tập đang có hiệu lực (Active) tại một thời điểm. Khi gói hiện tại hết hạn, bạn có thể đăng ký hoặc gia hạn gói mới.',
   },
 ];
 
+const packageFeatureTemplates = {
+  Basic: [
+    { text: 'Toàn quyền sử dụng khu Gym & Tạ tự do', included: true },
+    { text: 'Tủ khóa thông minh RFID tiêu chuẩn', included: true },
+    { text: 'Phòng tắm nóng lạnh & Máy sấy tóc tiện nghi', included: true },
+    { text: 'Đo chỉ số cơ thể InBody 1 lần/tháng', included: true },
+    { text: 'Hồ bơi nước mặn 4 mùa', included: false },
+    { text: 'Xông hơi Sauna đá muối Himalaya', included: false },
+  ],
+  Premium: [
+    { text: 'Toàn quyền sử dụng khu Gym & Tạ tự do', included: true },
+    { text: 'Hồ bơi nước mặn bốn mùa không giới hạn', included: true },
+    { text: 'Tham gia không giới hạn các lớp Yoga & GroupX', included: true },
+    { text: 'Phòng xông hơi khô đá muối & xông ướt', included: true },
+    { text: 'Tặng 02 buổi tập riêng 1:1 cùng Huấn luyện viên', included: true },
+    { text: 'Tủ khóa cá nhân thông minh RFID', included: true },
+  ],
+  Annual: [
+    { text: 'Tất cả quyền lợi của gói Premium trọn gói 365 ngày', included: true },
+    { text: 'Tặng 06 buổi tập cá nhân 1:1 cùng Master Coach', included: true },
+    { text: 'Đo InBody & Tư vấn dinh dưỡng cá nhân định kỳ', included: true },
+    { text: 'Quyền bảo lưu thẻ tập linh hoạt lên đến 90 ngày', included: true },
+    { text: 'Cung cấp khăn tắm lớn & nước detox mỗi ngày', included: true },
+    { text: 'Dẫn bạn bè tập cùng miễn phí 2 lần/tháng', included: true },
+  ],
+};
+
+const defaultFeatures = [
+  { text: 'Toàn quyền sử dụng thiết bị phòng tập chuẩn quốc tế', included: true },
+  { text: 'Tủ khóa thông minh RFID & phòng tắm nóng lạnh', included: true },
+  { text: 'Đo chỉ số thể hình InBody định kỳ', included: true },
+  { text: 'Hỗ trợ hướng dẫn kỹ thuật từ HLV trực sàn', included: true },
+];
+
 const Packages = () => {
-  const [cycle, setCycle] = useState('monthly'); // 'monthly' | 'quarterly' | 'yearly'
+  const [packagesList, setPackagesList] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [isBackendConnected, setIsBackendConnected] = useState(false);
   const [selectedPackage, setSelectedPackage] = useState(null);
   const [modalOpen, setModalOpen] = useState(false);
+
+  // Fetch real packages from backend: GET /api/packages
+  const fetchPackages = async () => {
+    setLoading(true);
+    try {
+      const data = await packageApi.getAll();
+      if (Array.isArray(data) && data.length > 0) {
+        // Map backend MembershipPackage entity
+        const mapped = data.map((pkg, idx) => {
+          const isHighlight = pkg.name === 'Premium' || idx === 1;
+          const badgeText = isHighlight ? 'PHỔ BIẾN NHẤT' : pkg.durationDays >= 365 ? 'TIẾT KIỆM 30%' : null;
+          const features = packageFeatureTemplates[pkg.name] || defaultFeatures;
+
+          return {
+            id: pkg.packageId,
+            packageId: pkg.packageId,
+            name: pkg.name,
+            tier: `GÓI ${pkg.durationDays} NGÀY`,
+            badge: badgeText,
+            highlight: isHighlight,
+            price: Number(pkg.price),
+            durationDays: pkg.durationDays,
+            description: pkg.description || `Gói tập ${pkg.name} chất lượng cao tại trung tâm thể thao AURA SPORT.`,
+            features,
+            buttonText: `Đăng Ký Gói ${pkg.name}`,
+            raw: pkg,
+          };
+        });
+
+        setPackagesList(mapped);
+        setIsBackendConnected(true);
+      } else {
+        setPackagesList(fallbackPackages);
+        setIsBackendConnected(false);
+      }
+    } catch (err) {
+      console.warn('Backend API /api/packages not reachable, falling back to local data:', err);
+      setPackagesList(fallbackPackages);
+      setIsBackendConnected(false);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchPackages();
+  }, []);
 
   const handleOpenRegister = (pkg) => {
     setSelectedPackage(pkg);
     setModalOpen(true);
-  };
-
-  const getPriceByCycle = (pkg) => {
-    if (cycle === 'yearly') return Math.round(pkg.priceYearly / 12);
-    if (cycle === 'quarterly') return Math.round(pkg.priceQuarterly / 3);
-    return pkg.priceMonthly;
   };
 
   return (
@@ -68,165 +149,152 @@ const Packages = () => {
       <Container maxWidth="xl">
         {/* Page Header */}
         <SectionHeader
-          badge="BẢNG GIÁ HỘI VIÊN"
+          badge="BẢNG GIÁ HỘI VIÊN (BACKEND API: /api/packages)"
           title="Chọn Gói Tập Phù Hợp Cho"
           highlightTitle="Mục Tiêu Thể Hình"
-          subtitle="Tất cả các gói đều bao gồm đo chỉ số InBody miễn phí, tủ đồ bảo mật RFID và phòng tắm nóng lạnh tiện nghi 5 sao."
+          subtitle="Dữ liệu gói tập và biểu phí được đồng bộ trực tiếp từ cơ sở dữ liệu hệ thống SCMS. Đăng ký nhận ngay quà tặng chào mừng!"
         />
 
-        {/* Cycle Switcher Tabs */}
-        <Box sx={{ display: 'flex', justifyContent: 'center', mb: 6 }}>
-          <Box
-            sx={{
-              bgcolor: '#FFFFFF',
-              p: 0.8,
-              borderRadius: 4,
-              boxShadow: '0 4px 16px rgba(0,0,0,0.06)',
-              border: '1px solid #E2E8F0',
-              display: 'inline-flex',
-              gap: 1,
-            }}
-          >
-            {[
-              { id: 'monthly', label: '1 Tháng' },
-              { id: 'quarterly', label: '3 Tháng (Tiết kiệm)' },
-              { id: 'yearly', label: '1 Năm (-20% Ưu đãi)', highlight: true },
-            ].map((tab) => (
-              <Button
-                key={tab.id}
-                variant={cycle === tab.id ? 'contained' : 'text'}
-                color={cycle === tab.id ? (tab.highlight ? 'secondary' : 'primary') : 'inherit'}
-                onClick={() => setCycle(tab.id)}
-                sx={{
-                  px: 3,
-                  py: 1.2,
-                  borderRadius: 3,
-                  fontWeight: 700,
-                  fontSize: '0.95rem',
-                }}
-              >
-                {tab.label}
-              </Button>
-            ))}
-          </Box>
+        {/* Backend Connectivity Status Banner */}
+        <Box sx={{ mb: 6, display: 'flex', justifyContent: 'flex-end' }}>
+          <Chip
+            icon={isBackendConnected ? <CloudDoneIcon /> : <CloudOffIcon />}
+            label={
+              isBackendConnected
+                ? 'Đã kết nối Backend API (/api/packages)'
+                : 'Chế độ ngoại tuyến (Hiển thị dữ liệu mẫu dự phòng)'
+            }
+            color={isBackendConnected ? 'success' : 'default'}
+            variant="outlined"
+            sx={{ fontWeight: 600, py: 0.5 }}
+          />
         </Box>
 
         {/* 1. MEMBERSHIP CARDS GRID */}
-        <Grid container spacing={3.5} sx={{ mb: 10 }}>
-          {membershipPackages.map((pkg) => {
-            const displayPrice = getPriceByCycle(pkg);
-            return (
-              <Grid size={{ xs: 12, sm: 6, lg: 3 }} key={pkg.id}>
-                <Card
-                  sx={{
-                    height: '100%',
-                    display: 'flex',
-                    flexDirection: 'column',
-                    borderRadius: 4,
-                    p: 3.5,
-                    position: 'relative',
-                    bgcolor: '#FFFFFF',
-                    border: pkg.highlight ? '2px solid #FF6B35' : '1px solid #E2E8F0',
-                    boxShadow: pkg.highlight ? '0 16px 36px rgba(255, 107, 53, 0.18)' : '0 4px 20px rgba(0,0,0,0.04)',
-                    transform: pkg.highlight ? { xs: 'none', lg: 'scale(1.03)' } : 'none',
-                    zIndex: pkg.highlight ? 2 : 1,
-                  }}
-                >
-                  {pkg.badge && (
-                    <Chip
-                      label={pkg.badge}
-                      color="secondary"
-                      size="small"
-                      sx={{
-                        position: 'absolute',
-                        top: -14,
-                        left: '50%',
-                        transform: 'translateX(-50%)',
-                        fontWeight: 800,
-                        fontSize: '0.75rem',
-                        boxShadow: '0 4px 12px rgba(255, 107, 53, 0.3)',
-                      }}
-                    />
-                  )}
+        {loading ? (
+          <Box sx={{ textAlign: 'center', py: 10 }}>
+            <CircularProgress color="primary" size={48} />
+            <Typography variant="body2" sx={{ color: 'text.secondary', mt: 2 }}>
+              Đang tải bảng giá gói tập từ máy chủ backend...
+            </Typography>
+          </Box>
+        ) : (
+          <Grid container spacing={3.5} sx={{ mb: 10 }} justifyContent="center">
+            {packagesList.map((pkg) => {
+              const displayPrice = pkg.price != null ? pkg.price : pkg.priceMonthly;
+              const durationDesc = pkg.durationDays
+                ? `${pkg.durationDays} ngày (~${Math.round(pkg.durationDays / 30)} tháng)`
+                : '1 Tháng';
 
-                  <Box sx={{ mb: 2 }}>
-                    <Typography variant="overline" color="text.secondary" sx={{ fontWeight: 800, letterSpacing: '0.08em' }}>
-                      {pkg.tier}
-                    </Typography>
-                    <Typography variant="h4" sx={{ fontWeight: 900, color: 'text.primary' }}>
-                      {pkg.name}
-                    </Typography>
-                  </Box>
-
-                  {/* Price */}
-                  <Box sx={{ my: 2 }}>
-                    <Box sx={{ display: 'flex', alignItems: 'baseline', gap: 0.5 }}>
-                      <Typography variant="h3" sx={{ fontWeight: 900, color: pkg.highlight ? 'secondary.main' : 'primary.main' }}>
-                        {displayPrice.toLocaleString('vi-VN')}
-                      </Typography>
-                      <Typography variant="subtitle2" color="text.secondary" sx={{ fontWeight: 700 }}>
-                        đ / tháng
-                      </Typography>
-                    </Box>
-                    <Typography variant="caption" sx={{ color: 'text.secondary', display: 'block', mt: 0.5 }}>
-                      {cycle === 'yearly'
-                        ? `Thanh toán cả năm: ${pkg.priceYearly.toLocaleString('vi-VN')} đ`
-                        : cycle === 'quarterly'
-                        ? `Thanh toán quý: ${pkg.priceQuarterly.toLocaleString('vi-VN')} đ`
-                        : 'Thanh toán linh hoạt từng tháng'}
-                    </Typography>
-                  </Box>
-
-                  <Typography variant="body2" color="text.secondary" sx={{ mb: 3, minHeight: 48, lineHeight: 1.6 }}>
-                    {pkg.description}
-                  </Typography>
-
-                  {/* Features */}
-                  <Typography variant="subtitle2" sx={{ fontWeight: 700, mb: 1.5, color: 'text.primary' }}>
-                    QUYỀN LỢI GÓI TẬP:
-                  </Typography>
-
-                  <Stack spacing={1.5} sx={{ mb: 4, flexGrow: 1 }}>
-                    {pkg.features.map((feat, idx) => (
-                      <Box key={idx} sx={{ display: 'flex', alignItems: 'flex-start', gap: 1.2 }}>
-                        {feat.included ? (
-                          <CheckCircleIcon sx={{ fontSize: 18, color: 'success.main', mt: 0.2 }} />
-                        ) : (
-                          <CancelIcon sx={{ fontSize: 18, color: '#CBD5E1', mt: 0.2 }} />
-                        )}
-                        <Typography
-                          variant="body2"
-                          sx={{
-                            color: feat.included ? 'text.primary' : '#94A3B8',
-                            fontSize: '0.85rem',
-                            lineHeight: 1.4,
-                          }}
-                        >
-                          {feat.text}
-                        </Typography>
-                      </Box>
-                    ))}
-                  </Stack>
-
-                  <Button
-                    fullWidth
-                    variant={pkg.highlight ? 'contained' : 'outlined'}
-                    color={pkg.highlight ? 'secondary' : 'primary'}
-                    size="large"
-                    onClick={() => handleOpenRegister(pkg)}
+              return (
+                <Grid size={{ xs: 12, sm: 6, lg: packagesList.length <= 3 ? 4 : 3 }} key={pkg.id || pkg.packageId}>
+                  <Card
                     sx={{
-                      fontWeight: 700,
-                      py: 1.4,
-                      boxShadow: pkg.highlight ? '0 6px 18px rgba(255, 107, 53, 0.4)' : 'none',
+                      height: '100%',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      borderRadius: 4,
+                      p: 3.5,
+                      position: 'relative',
+                      bgcolor: '#FFFFFF',
+                      border: pkg.highlight ? '2px solid #FF6B35' : '1px solid #E2E8F0',
+                      boxShadow: pkg.highlight ? '0 16px 36px rgba(255, 107, 53, 0.18)' : '0 4px 20px rgba(0,0,0,0.04)',
+                      transform: pkg.highlight ? { xs: 'none', lg: 'scale(1.03)' } : 'none',
+                      zIndex: pkg.highlight ? 2 : 1,
                     }}
                   >
-                    {pkg.buttonText}
-                  </Button>
-                </Card>
-              </Grid>
-            );
-          })}
-        </Grid>
+                    {pkg.badge && (
+                      <Chip
+                        label={pkg.badge}
+                        color="secondary"
+                        size="small"
+                        sx={{
+                          position: 'absolute',
+                          top: -14,
+                          left: '50%',
+                          transform: 'translateX(-50%)',
+                          fontWeight: 800,
+                          fontSize: '0.75rem',
+                          boxShadow: '0 4px 12px rgba(255, 107, 53, 0.3)',
+                        }}
+                      />
+                    )}
+
+                    <Box sx={{ mb: 2 }}>
+                      <Typography variant="overline" color="text.secondary" sx={{ fontWeight: 800, letterSpacing: '0.08em' }}>
+                        {pkg.tier}
+                      </Typography>
+                      <Typography variant="h4" sx={{ fontWeight: 900, color: 'text.primary' }}>
+                        {pkg.name}
+                      </Typography>
+                    </Box>
+
+                    {/* Price */}
+                    <Box sx={{ my: 2 }}>
+                      <Box sx={{ display: 'flex', alignItems: 'baseline', gap: 0.5 }}>
+                        <Typography variant="h3" sx={{ fontWeight: 900, color: pkg.highlight ? 'secondary.main' : 'primary.main' }}>
+                          {displayPrice ? Number(displayPrice).toLocaleString('vi-VN') : '0'}
+                        </Typography>
+                        <Typography variant="subtitle2" color="text.secondary" sx={{ fontWeight: 700 }}>
+                          đ
+                        </Typography>
+                      </Box>
+                      <Typography variant="caption" sx={{ color: 'text.secondary', display: 'block', mt: 0.5 }}>
+                        Thời lượng sử dụng: <strong>{durationDesc}</strong>
+                      </Typography>
+                    </Box>
+
+                    <Typography variant="body2" color="text.secondary" sx={{ mb: 3, minHeight: 48, lineHeight: 1.6 }}>
+                      {pkg.description}
+                    </Typography>
+
+                    {/* Features */}
+                    <Typography variant="subtitle2" sx={{ fontWeight: 700, mb: 1.5, color: 'text.primary' }}>
+                      QUYỀN LỢI GÓI TẬP:
+                    </Typography>
+
+                    <Stack spacing={1.5} sx={{ mb: 4, flexGrow: 1 }}>
+                      {pkg.features?.map((feat, idx) => (
+                        <Box key={idx} sx={{ display: 'flex', alignItems: 'flex-start', gap: 1.2 }}>
+                          {feat.included ? (
+                            <CheckCircleIcon sx={{ fontSize: 18, color: 'success.main', mt: 0.2 }} />
+                          ) : (
+                            <CancelIcon sx={{ fontSize: 18, color: '#CBD5E1', mt: 0.2 }} />
+                          )}
+                          <Typography
+                            variant="body2"
+                            sx={{
+                              color: feat.included ? 'text.primary' : '#94A3B8',
+                              fontSize: '0.85rem',
+                              lineHeight: 1.4,
+                            }}
+                          >
+                            {feat.text}
+                          </Typography>
+                        </Box>
+                      ))}
+                    </Stack>
+
+                    <Button
+                      fullWidth
+                      variant={pkg.highlight ? 'contained' : 'outlined'}
+                      color={pkg.highlight ? 'secondary' : 'primary'}
+                      size="large"
+                      onClick={() => handleOpenRegister(pkg)}
+                      sx={{
+                        fontWeight: 700,
+                        py: 1.4,
+                        boxShadow: pkg.highlight ? '0 6px 18px rgba(255, 107, 53, 0.4)' : 'none',
+                      }}
+                    >
+                      {pkg.buttonText || `Đăng Ký Gói ${pkg.name}`}
+                    </Button>
+                  </Card>
+                </Grid>
+              );
+            })}
+          </Grid>
+        )}
 
         {/* 2. BẢNG SO SÁNH GÓI (PACKAGE COMPARISON TABLE) */}
         <Box sx={{ mb: 10 }}>
@@ -253,16 +321,13 @@ const Packages = () => {
                     Dịch Vụ & Tiện Ích
                   </TableCell>
                   <TableCell align="center" sx={{ color: '#FFFFFF', fontWeight: 700 }}>
-                    Gói Silver
+                    Gói Basic (30 ngày)
                   </TableCell>
                   <TableCell align="center" sx={{ color: '#FF8A5B', fontWeight: 800, bgcolor: 'rgba(255, 107, 53, 0.15)' }}>
-                    Gói Gold (Phổ biến)
-                  </TableCell>
-                  <TableCell align="center" sx={{ color: '#42A5F5', fontWeight: 700 }}>
-                    Gói Platinum
+                    Gói Premium (90 ngày)
                   </TableCell>
                   <TableCell align="center" sx={{ color: '#FFD700', fontWeight: 800 }}>
-                    Gói Diamond VIP
+                    Gói Annual (365 ngày)
                   </TableCell>
                 </TableRow>
               </TableHead>
@@ -291,10 +356,7 @@ const Packages = () => {
                     >
                       {row.gold === 'Có' ? <CheckCircleIcon color="success" fontSize="small" /> : row.gold}
                     </TableCell>
-                    <TableCell align="center" sx={{ fontWeight: 600 }}>
-                      {row.platinum === 'Có' ? <CheckCircleIcon color="success" fontSize="small" /> : row.platinum}
-                    </TableCell>
-                    <TableCell align="center" sx={{ fontWeight: 700, color: 'primary.dark' }}>
+                    <TableCell align="center" sx={{ fontWeight: 800, color: 'primary.dark' }}>
                       {row.diamond}
                     </TableCell>
                   </TableRow>
